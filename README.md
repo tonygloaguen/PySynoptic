@@ -14,16 +14,19 @@ project.
 
 ## Current capabilities
 
-Version `0.0.3` analyzes either one `.py` file or a complete directory tree. It
+Version `0.0.4` analyzes either one `.py` file or a complete directory tree. It
 reports:
 
 - the file path and inferred module name;
 - top-level synchronous and asynchronous functions;
 - top-level classes;
-- top-level `import x` and `from x import y` statements;
+- structured `import x` and `from x import y` metadata from every lexical
+  scope, including aliases, relative levels, and source positions;
 - syntax errors with their source location;
 - recursively discovered Python files, including package entry points;
 - stable project-aware dotted module identities;
+- resolved, external, unresolved, ambiguous, and namespace import references;
+- deterministic, deduplicated dependencies between file-backed modules;
 - non-Python project resources grouped by broad type;
 - excluded paths and recoverable filesystem or source-reading errors.
 
@@ -36,6 +39,15 @@ For module identities, PySynoptic recognizes the conventional `src/` layout as
 well as flat projects. A project `src/` directory is treated as the most
 specific source root, while the project root remains available for top-level
 scripts. Namespace-style package directories do not require `__init__.py`.
+
+Import resolution only compares AST metadata with the discovered project module
+identities. It never inspects the runtime environment, installed packages, or
+the import system.
+
+Imports inside functions, classes, branches, loops, context managers,
+`try`/`except`/`finally`, `match` cases, and `TYPE_CHECKING` blocks are all
+recorded. PySynoptic does not predict whether a branch executes; every import
+present in the static syntax tree contributes to the analysis.
 
 ## Developer installation
 
@@ -88,6 +100,7 @@ Resources: 2
 Functions: 5
 Classes: 1
 Syntax errors: 0
+Dependencies: 2
 
 Files:
 - package
@@ -96,6 +109,10 @@ Files:
   package/__main__.py
 - package.service
   package/service.py
+
+Dependencies:
+- package -> package.service
+- package.__main__ -> package.service
 ```
 
 The analysis engine is also available independently of the CLI:
@@ -112,13 +129,17 @@ project_analysis = analyze_project(Path("path/to/project"))
 The scanner is a separate layer from Python AST analysis: it inventories files
 and resources but never parses source itself. Module identity resolution is a
 separate project-analysis step and does not modify the single-file analyzer's
-stem-based `module_name`.
+stem-based `module_name`. Project-level import resolution consumes structured
+AST metadata and emits a logical dependency graph as immutable Python data.
 
 ## Current limitations
 
 - declarations nested inside functions or classes are not catalogued;
-- import aliases are not retained as local names;
-- calls and dependencies between modules are not resolved;
+- dynamic imports and calls to `__import__` are not interpreted;
+- external versus unresolved classification is based only on known project
+  top-level names;
+- fileless namespace packages do not produce dependency edges themselves;
+- function calls are not resolved;
 - resources are catalogued but not linked to Python code;
 - symbolic links are excluded rather than followed;
 - source roots configured through packaging metadata are not yet interpreted;
@@ -126,9 +147,9 @@ stem-based `module_name`.
 
 ## Short roadmap
 
-1. Resolve static imports against known project module identities.
+1. Render the logical module graph as deterministic Mermaid text or SVG.
 2. Add JSON export for file and project analyses.
-3. Model function calls after module dependencies are stable.
+3. Model function calls after the first visual module graph is stable.
 4. Build an interactive visualization layer on top of the independent engine.
 
 ## License

@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from pysynoptic.models.imports import ImportReference
+
 
 @dataclass(frozen=True, slots=True)
 class FileAnalysis:
@@ -16,3 +18,4 @@ class FileAnalysis:
     classes: tuple[str, ...] = ()
     imports: tuple[str, ...] = ()
     syntax_error: str | None = None
+    import_references: tuple[ImportReference, ...] = ()

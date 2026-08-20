@@ -60,6 +60,7 @@ def format_project_analysis(analysis: ProjectAnalysis) -> str:
         f"Functions: {function_count}",
         f"Classes: {class_count}",
         f"Syntax errors: {syntax_error_count}",
+        f"Dependencies: {len(analysis.dependencies)}",
         "",
         "Files:",
     ]
@@ -78,6 +79,13 @@ def format_project_analysis(analysis: ProjectAnalysis) -> str:
             status = ""
         lines.append(f"- {module_identity.dotted_name}{status}")
         lines.append(f"  {relative_path}")
+
+    if analysis.dependencies:
+        lines.extend(("", "Dependencies:"))
+        for dependency in analysis.dependencies:
+            lines.append(
+                f"- {dependency.source.dotted_name} -> {dependency.target.dotted_name}"
+            )
 
     if analysis.errors:
         lines.extend(("", "Errors:"))

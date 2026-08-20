@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal, TypeAlias
 
 from pysynoptic.models.analysis import FileAnalysis
+from pysynoptic.models.imports import ImportReference
 
 ResourceKind: TypeAlias = Literal[
     "configuration",
@@ -18,6 +19,9 @@ ResourceKind: TypeAlias = Literal[
     "other",
 ]
 ErrorOperation: TypeAlias = Literal["identity", "scan", "read"]
+ImportResolutionStatus: TypeAlias = Literal[
+    "ambiguous", "external", "namespace", "resolved", "unresolved"
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +51,25 @@ class ModuleIdentity:
 
 
 @dataclass(frozen=True, slots=True)
+class ImportResolution:
+    """Project-level result of resolving one structured import reference."""
+
+    source: ModuleIdentity
+    reference: ImportReference
+    absolute_name: str | None
+    status: ImportResolutionStatus
+    targets: tuple[ModuleIdentity, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ModuleDependency:
+    """A directed dependency between two file-backed project modules."""
+
+    source: ModuleIdentity
+    target: ModuleIdentity
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectScan:
     """Filesystem inventory produced without parsing Python source."""
 
@@ -69,3 +92,5 @@ class ProjectAnalysis:
     errors: tuple[ProjectError, ...] = ()
     source_roots: tuple[Path, ...] = ()
     module_identities: tuple[ModuleIdentity, ...] = ()
+    import_resolutions: tuple[ImportResolution, ...] = ()
+    dependencies: tuple[ModuleDependency, ...] = ()

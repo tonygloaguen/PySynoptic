@@ -52,3 +52,17 @@ def test_cli_rejects_non_python_file(
 
     assert exit_code == 2
     assert "expected a .py file" in output
+
+
+def test_cli_displays_resolved_dependencies(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "target.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "source.py").write_text("import target\n", encoding="utf-8")
+
+    exit_code = main([str(tmp_path)])
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "Dependencies: 1" in output
+    assert "- source -> target" in output

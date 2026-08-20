@@ -5,16 +5,47 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from pysynoptic.models import FileAnalysis
+from pysynoptic.models import FileAnalysis, ImportReference
 
 
-def _import_names(node: ast.Import | ast.ImportFrom) -> tuple[str, ...]:
+def _import_references(
+    node: ast.Import | ast.ImportFrom,
+) -> tuple[ImportReference, ...]:
     if isinstance(node, ast.Import):
-        return tuple(alias.name for alias in node.names)
+        return tuple(
+            ImportReference(
+                kind="import",
+                module=alias.name,
+                imported_name=None,
+                alias=alias.asname,
+                level=0,
+                line=node.lineno,
+                column=node.col_offset,
+            )
+            for alias in node.names
+        )
 
-    module = f"{'.' * node.level}{node.module or ''}"
+    return tuple(
+        ImportReference(
+            kind="from",
+            module=node.module,
+            imported_name=alias.name,
+            alias=alias.asname,
+            level=node.level,
+            line=node.lineno,
+            column=node.col_offset,
+        )
+        for alias in node.names
+    )
+
+
+def _legacy_import_name(reference: ImportReference) -> str:
+    if reference.kind == "import":
+        return reference.module or ""
+
+    module = f"{'.' * reference.level}{reference.module or ''}"
     separator = "" if module.endswith(".") else "."
-    return tuple(f"{module}{separator}{alias.name}" for alias in node.names)
+    return f"{module}{separator}{reference.imported_name}"
 
 
 def _syntax_error_message(error: SyntaxError) -> str:
@@ -49,14 +80,26 @@ def analyze_python_file(path: Path) -> FileAnalysis:
     functions: list[str] = []
     classes: list[str] = []
     imports: list[str] = []
+    import_references: list[ImportReference] = []
 
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             functions.append(node.name)
         elif isinstance(node, ast.ClassDef):
             classes.append(node.name)
-        elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            imports.extend(_import_names(node))
+
+    import_nodes = sorted(
+        (
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+        ),
+        key=lambda node: (node.lineno, node.col_offset),
+    )
+    for node in import_nodes:
+        references = _import_references(node)
+        import_references.extend(references)
+        imports.extend(_legacy_import_name(reference) for reference in references)
 
     return FileAnalysis(
         path=path,
@@ -64,4 +107,5 @@ def analyze_python_file(path: Path) -> FileAnalysis:
         functions=tuple(functions),
         classes=tuple(classes),
         imports=tuple(imports),
+        import_references=tuple(import_references),
     )
