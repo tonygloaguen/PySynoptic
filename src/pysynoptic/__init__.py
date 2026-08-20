@@ -9,6 +9,7 @@ from pysynoptic.models import (
     ModuleIdentity,
     ProjectAnalysis,
 )
+from pysynoptic.renderers import render_mermaid, write_mermaid
 
 __all__ = [
     "FileAnalysis",
@@ -19,5 +20,7 @@ __all__ = [
     "ProjectAnalysis",
     "analyze_project",
     "analyze_python_file",
+    "render_mermaid",
+    "write_mermaid",
 ]
-__version__ = "0.0.4"
+__version__ = "0.0.5"

@@ -1,0 +1,87 @@
+flowchart LR
+  subgraph package_pysynoptic["pysynoptic"]
+    module_pysynoptic["pysynoptic"]
+    module_pysynoptic___main["pysynoptic.__main__"]
+    module_pysynoptic_analyzer["pysynoptic.analyzer"]
+    module_pysynoptic_analyzer_import_resolution["pysynoptic.analyzer.import_resolution"]
+    module_pysynoptic_analyzer_module_identity["pysynoptic.analyzer.module_identity"]
+    module_pysynoptic_analyzer_project["pysynoptic.analyzer.project"]
+    module_pysynoptic_analyzer_python_file["pysynoptic.analyzer.python_file"]
+    module_pysynoptic_cli["pysynoptic.cli"]
+    module_pysynoptic_models["pysynoptic.models"]
+    module_pysynoptic_models_analysis["pysynoptic.models.analysis"]
+    module_pysynoptic_models_imports["pysynoptic.models.imports"]
+    module_pysynoptic_models_project["pysynoptic.models.project"]
+    module_pysynoptic_renderers["pysynoptic.renderers"]
+    module_pysynoptic_renderers_mermaid["pysynoptic.renderers.mermaid"]
+    module_pysynoptic_scanner["pysynoptic.scanner"]
+    module_pysynoptic_scanner_exclusions["pysynoptic.scanner.exclusions"]
+    module_pysynoptic_scanner_project_scanner["pysynoptic.scanner.project_scanner"]
+  end
+  subgraph package_tests["tests"]
+    module_tests["tests"]
+    module_tests_test_cli["tests.test_cli"]
+    module_tests_test_import_metadata["tests.test_import_metadata"]
+    module_tests_test_import_resolution["tests.test_import_resolution"]
+    module_tests_test_mermaid_renderer["tests.test_mermaid_renderer"]
+    module_tests_test_module_identity["tests.test_module_identity"]
+    module_tests_test_nested_imports["tests.test_nested_imports"]
+    module_tests_test_project_analysis["tests.test_project_analysis"]
+    module_tests_test_python_file["tests.test_python_file"]
+  end
+  module_pysynoptic --> module_pysynoptic_analyzer_project
+  module_pysynoptic --> module_pysynoptic_analyzer_python_file
+  module_pysynoptic --> module_pysynoptic_models_analysis
+  module_pysynoptic --> module_pysynoptic_models_imports
+  module_pysynoptic --> module_pysynoptic_models_project
+  module_pysynoptic --> module_pysynoptic_renderers_mermaid
+  module_pysynoptic___main --> module_pysynoptic_cli
+  module_pysynoptic_analyzer --> module_pysynoptic_analyzer_project
+  module_pysynoptic_analyzer --> module_pysynoptic_analyzer_python_file
+  module_pysynoptic_analyzer_import_resolution --> module_pysynoptic_models_analysis
+  module_pysynoptic_analyzer_import_resolution --> module_pysynoptic_models_imports
+  module_pysynoptic_analyzer_import_resolution --> module_pysynoptic_models_project
+  module_pysynoptic_analyzer_module_identity --> module_pysynoptic_models_project
+  module_pysynoptic_analyzer_project --> module_pysynoptic_analyzer_import_resolution
+  module_pysynoptic_analyzer_project --> module_pysynoptic_analyzer_module_identity
+  module_pysynoptic_analyzer_project --> module_pysynoptic_analyzer_python_file
+  module_pysynoptic_analyzer_project --> module_pysynoptic_models_project
+  module_pysynoptic_analyzer_project --> module_pysynoptic_scanner_project_scanner
+  module_pysynoptic_analyzer_python_file --> module_pysynoptic_models_analysis
+  module_pysynoptic_analyzer_python_file --> module_pysynoptic_models_imports
+  module_pysynoptic_cli --> module_pysynoptic_analyzer_project
+  module_pysynoptic_cli --> module_pysynoptic_analyzer_python_file
+  module_pysynoptic_cli --> module_pysynoptic_models_analysis
+  module_pysynoptic_cli --> module_pysynoptic_models_project
+  module_pysynoptic_cli --> module_pysynoptic_renderers_mermaid
+  module_pysynoptic_models --> module_pysynoptic_models_analysis
+  module_pysynoptic_models --> module_pysynoptic_models_imports
+  module_pysynoptic_models --> module_pysynoptic_models_project
+  module_pysynoptic_models_analysis --> module_pysynoptic_models_imports
+  module_pysynoptic_models_project --> module_pysynoptic_models_analysis
+  module_pysynoptic_models_project --> module_pysynoptic_models_imports
+  module_pysynoptic_renderers --> module_pysynoptic_renderers_mermaid
+  module_pysynoptic_renderers_mermaid --> module_pysynoptic_models_project
+  module_pysynoptic_scanner --> module_pysynoptic_scanner_exclusions
+  module_pysynoptic_scanner --> module_pysynoptic_scanner_project_scanner
+  module_pysynoptic_scanner_project_scanner --> module_pysynoptic_models_project
+  module_pysynoptic_scanner_project_scanner --> module_pysynoptic_scanner_exclusions
+  module_tests_test_cli --> module_pysynoptic_cli
+  module_tests_test_import_metadata --> module_pysynoptic_analyzer_python_file
+  module_tests_test_import_metadata --> module_pysynoptic_models_imports
+  module_tests_test_import_resolution --> module_pysynoptic_analyzer_project
+  module_tests_test_import_resolution --> module_pysynoptic_models_project
+  module_tests_test_mermaid_renderer --> module_pysynoptic_analyzer_project
+  module_tests_test_mermaid_renderer --> module_pysynoptic_models_project
+  module_tests_test_mermaid_renderer --> module_pysynoptic_renderers_mermaid
+  module_tests_test_module_identity --> module_pysynoptic_analyzer_project
+  module_tests_test_module_identity --> module_pysynoptic_analyzer_python_file
+  module_tests_test_module_identity --> module_pysynoptic_models_project
+  module_tests_test_module_identity --> module_pysynoptic_scanner_project_scanner
+  module_tests_test_nested_imports --> module_pysynoptic_analyzer_project
+  module_tests_test_nested_imports --> module_pysynoptic_analyzer_python_file
+  module_tests_test_project_analysis --> module_pysynoptic_analyzer_project
+  module_tests_test_project_analysis --> module_pysynoptic_models_analysis
+  module_tests_test_project_analysis --> module_pysynoptic_scanner_exclusions
+  module_tests_test_project_analysis --> module_pysynoptic_scanner_project_scanner
+  module_tests_test_python_file --> module_pysynoptic_analyzer_python_file

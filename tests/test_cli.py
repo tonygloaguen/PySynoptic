@@ -66,3 +66,46 @@ def test_cli_displays_resolved_dependencies(
     assert exit_code == 0
     assert "Dependencies: 1" in output
     assert "- source -> target" in output
+
+
+def test_cli_renders_mermaid_to_stdout(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "module.py").write_text("value = 1\n", encoding="utf-8")
+
+    exit_code = main([str(tmp_path), "--format", "mermaid"])
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert output == 'flowchart LR\n  module_module["module"]\n'
+
+
+def test_cli_writes_mermaid_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "module.py").write_text("value = 1\n", encoding="utf-8")
+    output_path = tmp_path / "docs" / "dependencies.mmd"
+
+    exit_code = main(
+        [str(tmp_path), "--format", "mermaid", "--output", str(output_path)]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert output_path.read_text(encoding="utf-8") == (
+        'flowchart LR\n  module_module["module"]\n'
+    )
+    assert f"Wrote Mermaid graph to {output_path}" in output
+
+
+def test_cli_rejects_mermaid_for_single_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "module.py"
+    path.write_text("value = 1\n", encoding="utf-8")
+
+    exit_code = main([str(path), "--format", "mermaid"])
+    output = capsys.readouterr().out
+
+    assert exit_code == 2
+    assert "Mermaid output requires a project directory" in output

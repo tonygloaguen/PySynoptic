@@ -8,6 +8,7 @@ from pathlib import Path
 
 from pysynoptic.analyzer import analyze_project, analyze_python_file
 from pysynoptic.models import FileAnalysis, ProjectAnalysis
+from pysynoptic.renderers import render_mermaid, write_mermaid
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -16,6 +17,13 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Statically inspect a Python source file or project directory.",
     )
     parser.add_argument("path", type=Path, help="Python file or project to analyze")
+    parser.add_argument(
+        "--format",
+        choices=("mermaid", "text"),
+        default="text",
+        help="Output format for the analysis (default: text)",
+    )
+    parser.add_argument("-o", "--output", type=Path, help="Write output to a file")
     return parser
 
 
@@ -103,14 +111,35 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.path.is_dir():
             project_analysis = analyze_project(args.path)
-            print(format_project_analysis(project_analysis))
+            if args.format == "mermaid":
+                if args.output is None:
+                    print(render_mermaid(project_analysis), end="")
+                else:
+                    write_mermaid(project_analysis, args.output)
+                    print(f"Wrote Mermaid graph to {args.output}")
+            else:
+                output = format_project_analysis(project_analysis)
+                if args.output is None:
+                    print(output)
+                else:
+                    args.output.parent.mkdir(parents=True, exist_ok=True)
+                    args.output.write_text(f"{output}\n", encoding="utf-8")
+                    print(f"Wrote analysis to {args.output}")
             has_syntax_errors = any(
                 item.syntax_error is not None for item in project_analysis.file_analyses
             )
             return 1 if has_syntax_errors or project_analysis.errors else 0
         if args.path.is_file():
+            if args.format == "mermaid":
+                raise ValueError("Mermaid output requires a project directory")
             analysis = analyze_python_file(args.path)
-            print(format_analysis(analysis))
+            output = format_analysis(analysis)
+            if args.output is None:
+                print(output)
+            else:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(f"{output}\n", encoding="utf-8")
+                print(f"Wrote analysis to {args.output}")
             return 1 if analysis.syntax_error is not None else 0
         if not args.path.exists():
             raise FileNotFoundError(f"Path not found: {args.path}")

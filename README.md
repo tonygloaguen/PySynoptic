@@ -14,7 +14,7 @@ project.
 
 ## Current capabilities
 
-Version `0.0.4` analyzes either one `.py` file or a complete directory tree. It
+Version `0.0.5` analyzes either one `.py` file or a complete directory tree. It
 reports:
 
 - the file path and inferred module name;
@@ -27,6 +27,7 @@ reports:
 - stable project-aware dotted module identities;
 - resolved, external, unresolved, ambiguous, and namespace import references;
 - deterministic, deduplicated dependencies between file-backed modules;
+- deterministic Mermaid flowcharts generated directly from project analyses;
 - non-Python project resources grouped by broad type;
 - excluded paths and recoverable filesystem or source-reading errors.
 
@@ -78,6 +79,8 @@ point:
 pysynoptic path/to/module.py
 python -m pysynoptic path/to/module.py
 pysynoptic path/to/project
+pysynoptic path/to/project --format mermaid
+pysynoptic path/to/project --format mermaid --output dependencies.mmd
 ```
 
 Example output:
@@ -120,10 +123,11 @@ The analysis engine is also available independently of the CLI:
 ```python
 from pathlib import Path
 
-from pysynoptic import analyze_project, analyze_python_file
+from pysynoptic import analyze_project, analyze_python_file, render_mermaid
 
 file_analysis = analyze_python_file(Path("path/to/module.py"))
 project_analysis = analyze_project(Path("path/to/project"))
+mermaid = render_mermaid(project_analysis)
 ```
 
 The scanner is a separate layer from Python AST analysis: it inventories files
@@ -131,6 +135,15 @@ and resources but never parses source itself. Module identity resolution is a
 separate project-analysis step and does not modify the single-file analyzer's
 stem-based `module_name`. Project-level import resolution consumes structured
 AST metadata and emits a logical dependency graph as immutable Python data.
+The Mermaid renderer consumes only this completed `ProjectAnalysis`; it never
+reads or imports analyzed source code.
+
+## Generated architecture diagram
+
+PySynoptic generates its own dependency diagram at
+[`docs/pysynoptic-dependencies.mmd`](docs/pysynoptic-dependencies.mmd). Nodes
+are grouped by their top-level package, and both nodes and edges are emitted in
+a stable order suitable for version control and exact-string testing.
 
 ## Current limitations
 
@@ -140,6 +153,7 @@ AST metadata and emits a logical dependency graph as immutable Python data.
   top-level names;
 - fileless namespace packages do not produce dependency edges themselves;
 - function calls are not resolved;
+- Mermaid output currently supports module dependencies only;
 - resources are catalogued but not linked to Python code;
 - symbolic links are excluded rather than followed;
 - source roots configured through packaging metadata are not yet interpreted;
@@ -147,9 +161,9 @@ AST metadata and emits a logical dependency graph as immutable Python data.
 
 ## Short roadmap
 
-1. Render the logical module graph as deterministic Mermaid text or SVG.
-2. Add JSON export for file and project analyses.
-3. Model function calls after the first visual module graph is stable.
+1. Add JSON export for file and project analyses.
+2. Model function and method calls on top of the stable module graph.
+3. Add graph filtering and visual styles for dependency categories.
 4. Build an interactive visualization layer on top of the independent engine.
 
 ## License
