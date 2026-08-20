@@ -65,20 +65,19 @@ def format_project_analysis(analysis: ProjectAnalysis) -> str:
     ]
 
     analyses_by_path = {item.path: item for item in analysis.file_analyses}
-    if not analysis.python_files:
+    if not analysis.module_identities:
         lines.append("- (none)")
-    for python_file in analysis.python_files:
-        relative_path = _relative_path(python_file, analysis.root_path)
-        file_analysis = analyses_by_path.get(python_file)
+    for module_identity in analysis.module_identities:
+        relative_path = _relative_path(module_identity.path, analysis.root_path)
+        file_analysis = analyses_by_path.get(module_identity.path)
         if file_analysis is None:
-            lines.append(f"- {relative_path}: analysis unavailable")
+            status = " [analysis unavailable]"
         elif file_analysis.syntax_error is not None:
-            lines.append(f"- {relative_path}: syntax error")
+            status = " [syntax error]"
         else:
-            lines.append(
-                f"- {relative_path}: {len(file_analysis.functions)} functions, "
-                f"{len(file_analysis.classes)} classes"
-            )
+            status = ""
+        lines.append(f"- {module_identity.dotted_name}{status}")
+        lines.append(f"  {relative_path}")
 
     if analysis.errors:
         lines.extend(("", "Errors:"))

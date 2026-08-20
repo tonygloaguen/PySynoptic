@@ -14,7 +14,7 @@ project.
 
 ## Current capabilities
 
-Version `0.0.2` analyzes either one `.py` file or a complete directory tree. It
+Version `0.0.3` analyzes either one `.py` file or a complete directory tree. It
 reports:
 
 - the file path and inferred module name;
@@ -23,6 +23,7 @@ reports:
 - top-level `import x` and `from x import y` statements;
 - syntax errors with their source location;
 - recursively discovered Python files, including package entry points;
+- stable project-aware dotted module identities;
 - non-Python project resources grouped by broad type;
 - excluded paths and recoverable filesystem or source-reading errors.
 
@@ -30,6 +31,11 @@ Common generated, environment, dependency, and cache directories such as
 `.git`, `.venv`, `__pycache__`, `node_modules`, `build`, and `dist` are excluded
 without being traversed. One invalid or unreadable Python file does not prevent
 the remaining project from being analyzed.
+
+For module identities, PySynoptic recognizes the conventional `src/` layout as
+well as flat projects. A project `src/` directory is treated as the most
+specific source root, while the project root remains available for top-level
+scripts. Namespace-style package directories do not require `__init__.py`.
 
 ## Developer installation
 
@@ -84,9 +90,12 @@ Classes: 1
 Syntax errors: 0
 
 Files:
-- __main__.py: 1 functions, 0 classes
-- package/__init__.py: 0 functions, 0 classes
-- package/service.py: 4 functions, 1 classes
+- package
+  package/__init__.py
+- package.__main__
+  package/__main__.py
+- package.service
+  package/service.py
 ```
 
 The analysis engine is also available independently of the CLI:
@@ -101,22 +110,25 @@ project_analysis = analyze_project(Path("path/to/project"))
 ```
 
 The scanner is a separate layer from Python AST analysis: it inventories files
-and resources but never parses source itself.
+and resources but never parses source itself. Module identity resolution is a
+separate project-analysis step and does not modify the single-file analyzer's
+stem-based `module_name`.
 
 ## Current limitations
 
 - declarations nested inside functions or classes are not catalogued;
 - import aliases are not retained as local names;
-- module names are not yet derived from package-relative paths;
 - calls and dependencies between modules are not resolved;
 - resources are catalogued but not linked to Python code;
-- symbolic links are excluded rather than followed.
+- symbolic links are excluded rather than followed;
+- source roots configured through packaging metadata are not yet interpreted;
+- only the conventional top-level `src/` directory is detected specially.
 
 ## Short roadmap
 
-1. Derive stable dotted module identities from project-relative paths.
+1. Resolve static imports against known project module identities.
 2. Add JSON export for file and project analyses.
-3. Model module-to-module dependencies and function calls.
+3. Model function calls after module dependencies are stable.
 4. Build an interactive visualization layer on top of the independent engine.
 
 ## License

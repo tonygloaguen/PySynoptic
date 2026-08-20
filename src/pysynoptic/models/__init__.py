@@ -2,6 +2,7 @@
 
 from pysynoptic.models.analysis import FileAnalysis
 from pysynoptic.models.project import (
+    ModuleIdentity,
     ProjectAnalysis,
     ProjectError,
     ProjectResource,
@@ -10,6 +11,7 @@ from pysynoptic.models.project import (
 
 __all__ = [
     "FileAnalysis",
+    "ModuleIdentity",
     "ProjectAnalysis",
     "ProjectError",
     "ProjectResource",

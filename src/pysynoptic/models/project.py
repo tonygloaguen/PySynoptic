@@ -17,7 +17,7 @@ ResourceKind: TypeAlias = Literal[
     "web",
     "other",
 ]
-ErrorOperation: TypeAlias = Literal["scan", "read"]
+ErrorOperation: TypeAlias = Literal["identity", "scan", "read"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +35,15 @@ class ProjectError:
     path: Path
     operation: ErrorOperation
     message: str
+
+
+@dataclass(frozen=True, slots=True)
+class ModuleIdentity:
+    """A project-aware dotted name assigned to one Python source file."""
+
+    path: Path
+    dotted_name: str
+    source_root: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,3 +67,5 @@ class ProjectAnalysis:
     excluded_paths: tuple[Path, ...] = ()
     file_analyses: tuple[FileAnalysis, ...] = ()
     errors: tuple[ProjectError, ...] = ()
+    source_roots: tuple[Path, ...] = ()
+    module_identities: tuple[ModuleIdentity, ...] = ()
