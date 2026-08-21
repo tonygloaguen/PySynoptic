@@ -2,6 +2,8 @@
 
 from pysynoptic.analyzer import analyze_project, analyze_python_file
 from pysynoptic.models import (
+    CallableSymbol,
+    CallReference,
     FileAnalysis,
     ImportReference,
     ImportResolution,
@@ -12,6 +14,8 @@ from pysynoptic.models import (
 from pysynoptic.renderers import render_mermaid, write_mermaid
 
 __all__ = [
+    "CallReference",
+    "CallableSymbol",
     "FileAnalysis",
     "ImportReference",
     "ImportResolution",
@@ -23,4 +27,4 @@ __all__ = [
     "render_mermaid",
     "write_mermaid",
 ]
-__version__ = "0.0.7"
+__version__ = "0.0.8"

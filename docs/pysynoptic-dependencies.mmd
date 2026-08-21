@@ -3,6 +3,7 @@ flowchart LR
     module_pysynoptic["pysynoptic"]
     module_pysynoptic___main["pysynoptic.__main__"]
     module_pysynoptic_analyzer["pysynoptic.analyzer"]
+    module_pysynoptic_analyzer_callables["pysynoptic.analyzer.callables"]
     module_pysynoptic_analyzer_import_resolution["pysynoptic.analyzer.import_resolution"]
     module_pysynoptic_analyzer_module_identity["pysynoptic.analyzer.module_identity"]
     module_pysynoptic_analyzer_project["pysynoptic.analyzer.project"]
@@ -20,6 +21,7 @@ flowchart LR
     module_pysynoptic_models_analysis["pysynoptic.models.analysis"]
     module_pysynoptic_models_imports["pysynoptic.models.imports"]
     module_pysynoptic_models_project["pysynoptic.models.project"]
+    module_pysynoptic_models_symbols["pysynoptic.models.symbols"]
     module_pysynoptic_renderers["pysynoptic.renderers"]
     module_pysynoptic_renderers_mermaid["pysynoptic.renderers.mermaid"]
     module_pysynoptic_scanner["pysynoptic.scanner"]
@@ -28,6 +30,7 @@ flowchart LR
   end
   subgraph package_tests["tests"]
     module_tests["tests"]
+    module_tests_test_callable_analysis["tests.test_callable_analysis"]
     module_tests_test_cli["tests.test_cli"]
     module_tests_test_graph_layout["tests.test_graph_layout"]
     module_tests_test_gui_controller["tests.test_gui_controller"]
@@ -44,10 +47,12 @@ flowchart LR
   module_pysynoptic --> module_pysynoptic_models_analysis
   module_pysynoptic --> module_pysynoptic_models_imports
   module_pysynoptic --> module_pysynoptic_models_project
+  module_pysynoptic --> module_pysynoptic_models_symbols
   module_pysynoptic --> module_pysynoptic_renderers_mermaid
   module_pysynoptic___main --> module_pysynoptic_cli
   module_pysynoptic_analyzer --> module_pysynoptic_analyzer_project
   module_pysynoptic_analyzer --> module_pysynoptic_analyzer_python_file
+  module_pysynoptic_analyzer_callables --> module_pysynoptic_models_symbols
   module_pysynoptic_analyzer_import_resolution --> module_pysynoptic_models_analysis
   module_pysynoptic_analyzer_import_resolution --> module_pysynoptic_models_imports
   module_pysynoptic_analyzer_import_resolution --> module_pysynoptic_models_project
@@ -57,6 +62,7 @@ flowchart LR
   module_pysynoptic_analyzer_project --> module_pysynoptic_analyzer_python_file
   module_pysynoptic_analyzer_project --> module_pysynoptic_models_project
   module_pysynoptic_analyzer_project --> module_pysynoptic_scanner_project_scanner
+  module_pysynoptic_analyzer_python_file --> module_pysynoptic_analyzer_callables
   module_pysynoptic_analyzer_python_file --> module_pysynoptic_models_analysis
   module_pysynoptic_analyzer_python_file --> module_pysynoptic_models_imports
   module_pysynoptic_cli --> module_pysynoptic_analyzer_project
@@ -83,7 +89,9 @@ flowchart LR
   module_pysynoptic_models --> module_pysynoptic_models_analysis
   module_pysynoptic_models --> module_pysynoptic_models_imports
   module_pysynoptic_models --> module_pysynoptic_models_project
+  module_pysynoptic_models --> module_pysynoptic_models_symbols
   module_pysynoptic_models_analysis --> module_pysynoptic_models_imports
+  module_pysynoptic_models_analysis --> module_pysynoptic_models_symbols
   module_pysynoptic_models_project --> module_pysynoptic_models_analysis
   module_pysynoptic_models_project --> module_pysynoptic_models_imports
   module_pysynoptic_renderers --> module_pysynoptic_renderers_mermaid
@@ -92,6 +100,7 @@ flowchart LR
   module_pysynoptic_scanner --> module_pysynoptic_scanner_project_scanner
   module_pysynoptic_scanner_project_scanner --> module_pysynoptic_models_project
   module_pysynoptic_scanner_project_scanner --> module_pysynoptic_scanner_exclusions
+  module_tests_test_callable_analysis --> module_pysynoptic_analyzer_python_file
   module_tests_test_cli --> module_pysynoptic_cli
   module_tests_test_graph_layout --> module_pysynoptic_analyzer_project
   module_tests_test_graph_layout --> module_pysynoptic_graph_layout
