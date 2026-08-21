@@ -11,10 +11,12 @@ flowchart LR
     module_pysynoptic_analyzer_python_file["pysynoptic.analyzer.python_file"]
     module_pysynoptic_cli["pysynoptic.cli"]
     module_pysynoptic_graph["pysynoptic.graph"]
+    module_pysynoptic_graph_calls["pysynoptic.graph.calls"]
     module_pysynoptic_graph_layout["pysynoptic.graph.layout"]
     module_pysynoptic_gui["pysynoptic.gui"]
     module_pysynoptic_gui___main["pysynoptic.gui.__main__"]
     module_pysynoptic_gui_app["pysynoptic.gui.app"]
+    module_pysynoptic_gui_call_graph["pysynoptic.gui.call_graph"]
     module_pysynoptic_gui_controller["pysynoptic.gui.controller"]
     module_pysynoptic_gui_graph_canvas["pysynoptic.gui.graph_canvas"]
     module_pysynoptic_gui_state["pysynoptic.gui.state"]
@@ -34,6 +36,7 @@ flowchart LR
     module_tests_test_call_resolution["tests.test_call_resolution"]
     module_tests_test_callable_analysis["tests.test_callable_analysis"]
     module_tests_test_cli["tests.test_cli"]
+    module_tests_test_contextual_call_graph["tests.test_contextual_call_graph"]
     module_tests_test_graph_layout["tests.test_graph_layout"]
     module_tests_test_gui_controller["tests.test_gui_controller"]
     module_tests_test_import_metadata["tests.test_import_metadata"]
@@ -77,15 +80,23 @@ flowchart LR
   module_pysynoptic_cli --> module_pysynoptic_models_analysis
   module_pysynoptic_cli --> module_pysynoptic_models_project
   module_pysynoptic_cli --> module_pysynoptic_renderers_mermaid
+  module_pysynoptic_graph --> module_pysynoptic_graph_calls
   module_pysynoptic_graph --> module_pysynoptic_graph_layout
+  module_pysynoptic_graph_calls --> module_pysynoptic_graph_layout
+  module_pysynoptic_graph_calls --> module_pysynoptic_models_project
   module_pysynoptic_graph_layout --> module_pysynoptic_models_project
   module_pysynoptic_gui --> module_pysynoptic_gui_app
   module_pysynoptic_gui___main --> module_pysynoptic_gui
   module_pysynoptic_gui_app --> module_pysynoptic_graph_layout
+  module_pysynoptic_gui_app --> module_pysynoptic_gui_call_graph
   module_pysynoptic_gui_app --> module_pysynoptic_gui_controller
   module_pysynoptic_gui_app --> module_pysynoptic_gui_graph_canvas
   module_pysynoptic_gui_app --> module_pysynoptic_gui_state
   module_pysynoptic_gui_app --> module_pysynoptic_models_project
+  module_pysynoptic_gui_call_graph --> module_pysynoptic_graph_calls
+  module_pysynoptic_gui_call_graph --> module_pysynoptic_graph_layout
+  module_pysynoptic_gui_call_graph --> module_pysynoptic_gui_graph_canvas
+  module_pysynoptic_gui_call_graph --> module_pysynoptic_models_project
   module_pysynoptic_gui_controller --> module_pysynoptic_analyzer_project
   module_pysynoptic_gui_controller --> module_pysynoptic_analyzer_python_file
   module_pysynoptic_gui_controller --> module_pysynoptic_gui_state
@@ -111,6 +122,9 @@ flowchart LR
   module_tests_test_call_resolution --> module_pysynoptic_analyzer_project
   module_tests_test_callable_analysis --> module_pysynoptic_analyzer_python_file
   module_tests_test_cli --> module_pysynoptic_cli
+  module_tests_test_contextual_call_graph --> module_pysynoptic_analyzer_project
+  module_tests_test_contextual_call_graph --> module_pysynoptic_graph_calls
+  module_tests_test_contextual_call_graph --> module_pysynoptic_graph_layout
   module_tests_test_graph_layout --> module_pysynoptic_analyzer_project
   module_tests_test_graph_layout --> module_pysynoptic_graph_layout
   module_tests_test_gui_controller --> module_pysynoptic_gui_controller

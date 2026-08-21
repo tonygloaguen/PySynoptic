@@ -7,6 +7,7 @@ from pysynoptic.graph import (
     GraphNode,
     build_dependency_graph,
     layout_dependency_graph,
+    layout_graph,
     strongly_connected_components,
 )
 
@@ -134,3 +135,18 @@ def test_empty_project_has_empty_layout(tmp_path: Path) -> None:
     assert layout.layer_count == 0
     assert layout.width == 0
     assert layout.height == 0
+
+
+def test_generic_layout_positions_renderer_independent_graph() -> None:
+    graph = DependencyGraph(
+        nodes=(
+            GraphNode("caller", "package::caller", Path("package.py")),
+            GraphNode("callee", "package::callee", Path("package.py")),
+        ),
+        edges=(GraphEdge("caller", "callee"),),
+    )
+
+    layout = layout_graph(graph)
+
+    layers = {node.node.node_id: node.layer for node in layout.nodes}
+    assert layers == {"caller": 0, "callee": 1}

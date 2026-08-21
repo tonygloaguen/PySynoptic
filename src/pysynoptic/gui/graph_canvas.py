@@ -29,6 +29,10 @@ class DependencyGraphCanvas(ttk.Frame):
         master: Any,
         *,
         on_select: Callable[[GraphNode], None] | None = None,
+        on_activate: Callable[[GraphNode], None] | None = None,
+        node_label: str = "modules",
+        edge_label: str = "dependencies",
+        empty_message: str = "Analyze a project to display its dependency graph.",
     ) -> None:
         super().__init__(master)
         self._layout: GraphLayout | None = None
@@ -40,6 +44,10 @@ class DependencyGraphCanvas(ttk.Frame):
         self._offset_y = 0.0
         self._pan_anchor: tuple[float, float] | None = None
         self._on_select = on_select
+        self._on_activate = on_activate
+        self._node_label = node_label
+        self._edge_label = edge_label
+        self._empty_message = empty_message
 
         controls = ttk.Frame(self, padding=(0, 0, 0, 7))
         controls.pack(fill="x")
@@ -79,6 +87,7 @@ class DependencyGraphCanvas(ttk.Frame):
         )
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<ButtonPress-1>", self._pointer_down)
+        self.canvas.bind("<Double-Button-1>", self._pointer_activate)
         self.canvas.bind("<B1-Motion>", self._pointer_drag)
         self.canvas.bind("<ButtonRelease-1>", self._pointer_up)
         self.canvas.bind("<ButtonPress-2>", self._pointer_down)
@@ -153,6 +162,14 @@ class DependencyGraphCanvas(ttk.Frame):
         self._draw()
         self._update_status()
 
+    def activate_node(self, node_id: str) -> bool:
+        """Select and activate a node through the double-click callback."""
+        if not self.select_node(node_id):
+            return False
+        if self._on_activate is not None:
+            self._on_activate(self._nodes[node_id].node)
+        return True
+
     def _update_status(self) -> None:
         layout = self._layout
         if layout is None:
@@ -160,7 +177,10 @@ class DependencyGraphCanvas(ttk.Frame):
         elif self._selected_id:
             message = self._nodes[self._selected_id].node.label
         else:
-            message = f"{len(layout.nodes)} modules · {len(layout.edges)} dependencies"
+            message = (
+                f"{len(layout.nodes)} {self._node_label} · "
+                f"{len(layout.edges)} {self._edge_label}"
+            )
         self.graph_status_variable.set(message)
         self.zoom_variable.set(f"{self._scale:.0%}")
 
@@ -241,7 +261,7 @@ class DependencyGraphCanvas(ttk.Frame):
             self.canvas.create_text(
                 width / 2,
                 height / 2,
-                text="Analyze a project to display its dependency graph.",
+                text=self._empty_message,
                 fill="#6c757d",
                 font=("TkDefaultFont", 11),
             )
@@ -322,6 +342,11 @@ class DependencyGraphCanvas(ttk.Frame):
         self._offset_y += event.y - anchor_y
         self._pan_anchor = (event.x, event.y)
         self._draw()
+
+    def _pointer_activate(self, _event: tk.Event[tk.Misc]) -> None:
+        node_id = self._current_node_id()
+        if node_id is not None:
+            self.activate_node(node_id)
 
     def _pointer_up(self, _event: tk.Event[tk.Misc]) -> None:
         self._pan_anchor = None
