@@ -14,8 +14,8 @@ project.
 
 ## Current capabilities
 
-Version `0.0.6` provides both the established command-line interface and a
-first desktop interface. It analyzes either one `.py` file or a complete
+Version `0.0.7` provides both the established command-line interface and an
+interactive desktop interface. It analyzes either one `.py` file or a complete
 directory tree and reports:
 
 - the file path and inferred module name;
@@ -34,9 +34,10 @@ directory tree and reports:
 
 The desktop application lets the user select a Python file or project, start
 the same static analysis used by the CLI, browse the discovered project tree,
-inspect a summary and resolved module dependencies, view the generated Mermaid
-source, and export it as an `.mmd` file. GUI orchestration remains separate from
-the scanner, analyzer, models, and renderer.
+navigate a native interactive dependency graph, inspect a summary and resolved
+module dependencies, view the generated Mermaid source, and export it as an
+`.mmd` file. GUI orchestration remains separate from the scanner, analyzer,
+models, layout, and Canvas renderer.
 
 Common generated, environment, dependency, and cache directories such as
 `.git`, `.venv`, `__pycache__`, `node_modules`, `build`, and `dist` are excluded
@@ -93,8 +94,14 @@ python -m pysynoptic.gui
 
 Use **Open Python File** for a single source file or **Open Project** for a
 directory, then select **Analyze**. Project analyses populate the project tree
-and the **Overview**, **Dependencies**, and **Mermaid** tabs. **Export Mermaid**
-becomes available after a project analysis.
+and the **Overview**, **Graph**, **Dependencies**, and **Mermaid** tabs.
+**Export Mermaid** becomes available after a project analysis.
+
+In the **Graph** tab, drag an empty area to pan, use the mouse wheel or `+` and
+`−` controls to zoom, and select **Fit** to restore the complete view. Selecting
+a node emphasizes both incoming and outgoing dependencies while muting the
+rest of the graph. Selecting a Python module in the project tree opens the
+graph, selects the matching node, and centers it in the viewport.
 
 The desktop layer uses `ttkbootstrap` for native Tk widgets and styling. It
 delegates all analysis and rendering to the existing public engine APIs; it
@@ -170,8 +177,11 @@ reads or imports analyzed source code.
 
 The desktop layer follows the same boundary. Its immutable application state
 contains the selected target and completed analysis values, while a small
-controller coordinates the existing public APIs. Tk widgets are responsible
-only for file dialogs and presenting that state.
+controller coordinates the existing public APIs. A deterministic pure-Python
+layout condenses strongly connected components, layers the resulting DAG, and
+positions every module. The native Tk Canvas consumes only those positioned
+values and owns viewport transforms, drawing, and selection. Tk widgets remain
+responsible only for file dialogs and presenting completed state.
 
 ## Generated architecture diagram
 
@@ -191,6 +201,8 @@ a stable order suitable for version control and exact-string testing.
 - Mermaid output currently supports module dependencies only;
 - analysis runs synchronously in the desktop application, so very large
   projects can temporarily block the interface;
+- the dependency layout is optimized for small and medium projects and does
+  not yet provide filtering or package collapsing;
 - Mermaid is displayed and exported as source text, without an embedded visual
   preview;
 - resources are catalogued but not linked to Python code;

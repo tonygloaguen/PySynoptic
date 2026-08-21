@@ -9,8 +9,11 @@ from tkinter.scrolledtext import ScrolledText
 
 import ttkbootstrap as ttk
 
+from pysynoptic.graph import layout_dependency_graph
 from pysynoptic.gui.controller import ApplicationController
+from pysynoptic.gui.graph_canvas import DependencyGraphCanvas
 from pysynoptic.gui.state import ApplicationState
+from pysynoptic.models import ProjectAnalysis
 
 
 class PySynopticApp(ttk.Window):
@@ -20,6 +23,8 @@ class PySynopticApp(ttk.Window):
         super().__init__(themename="flatly")
         self.controller = controller or ApplicationController()
         self.state = ApplicationState()
+        self._graph_analysis: ProjectAnalysis | None = None
+        self._tree_graph_nodes: dict[str, str] = {}
 
         self.title("PySynoptic")
         self.geometry("1180x760")
@@ -84,12 +89,20 @@ class PySynopticApp(ttk.Window):
         self.project_tree.configure(yscrollcommand=tree_scrollbar.set)
         self.project_tree.pack(side="left", fill="both", expand=True)
         tree_scrollbar.pack(side="right", fill="y")
+        self.project_tree.bind("<<TreeviewSelect>>", self._navigate_tree_to_graph)
 
         self.notebook = ttk.Notebook(detail_panel)
         self.notebook.pack(fill="both", expand=True)
         self.overview_text = self._add_text_tab("Overview")
+        self._add_graph_tab()
         self.dependencies_text = self._add_text_tab("Dependencies")
         self.mermaid_text = self._add_text_tab("Mermaid", fixed_width=True)
+
+    def _add_graph_tab(self) -> None:
+        self.graph_panel = ttk.Frame(self.notebook, padding=8)
+        self.graph_canvas = DependencyGraphCanvas(self.graph_panel)
+        self.graph_canvas.pack(fill="both", expand=True)
+        self.notebook.add(self.graph_panel, text="Graph")
 
     def _add_text_tab(self, label: str, *, fixed_width: bool = False) -> ScrolledText:
         panel = ttk.Frame(self.notebook, padding=8)
@@ -184,6 +197,7 @@ class PySynopticApp(ttk.Window):
             state="normal" if self.state.project_analysis else "disabled"
         )
         self._render_tree()
+        self._render_graph()
         self._set_text(self.overview_text, self._overview_content())
         self._set_text(self.dependencies_text, self._dependencies_content())
         self._set_text(
@@ -199,6 +213,7 @@ class PySynopticApp(ttk.Window):
         widget.configure(state="disabled")
 
     def _render_tree(self) -> None:
+        self._tree_graph_nodes.clear()
         self.project_tree.delete(*self.project_tree.get_children())
         selected_path = self.state.selected_path
         if selected_path is None:
@@ -219,6 +234,10 @@ class PySynopticApp(ttk.Window):
         if analysis is None:
             return
 
+        module_paths = {
+            identity.path: identity.path.as_posix()
+            for identity in analysis.module_identities
+        }
         paths = list(analysis.python_files)
         paths.extend(resource.path for resource in analysis.resources)
         tree_items: dict[tuple[str, ...], str] = {(): root_id}
@@ -237,6 +256,31 @@ class PySynopticApp(ttk.Window):
                         text=part,
                     )
                 parent_key = key
+            node_id = module_paths.get(path)
+            if node_id is not None:
+                self._tree_graph_nodes[tree_items[parent_key]] = node_id
+
+    def _render_graph(self) -> None:
+        analysis = self.state.project_analysis
+        if analysis is None:
+            if self._graph_analysis is not None:
+                self.graph_canvas.clear()
+                self._graph_analysis = None
+            return
+        if analysis is self._graph_analysis:
+            return
+        self.graph_canvas.set_layout(layout_dependency_graph(analysis))
+        self._graph_analysis = analysis
+
+    def _navigate_tree_to_graph(self, _event: object) -> None:
+        selected = self.project_tree.selection()
+        if not selected:
+            return
+        node_id = self._tree_graph_nodes.get(selected[0])
+        if node_id is None:
+            return
+        if self.graph_canvas.select_node(node_id, center=True):
+            self.notebook.select(self.graph_panel)
 
     def _overview_content(self) -> str:
         if self.state.file_analysis is not None:
