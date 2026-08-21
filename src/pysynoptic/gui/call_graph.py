@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import ttkbootstrap as ttk
@@ -12,11 +13,16 @@ from pysynoptic.graph import (
     ContextualCallGraph,
     build_contextual_call_graph,
     call_graph_roots,
+    callable_details,
     layout_graph,
     search_call_graph_roots,
 )
 from pysynoptic.graph.layout import GraphNode
 from pysynoptic.gui.graph_canvas import DependencyGraphCanvas
+from pysynoptic.gui.graph_helpers import (
+    DEFAULT_CALL_DEPTH,
+    empty_outgoing_suggestion,
+)
 from pysynoptic.models import ProjectAnalysis
 
 _DIRECTIONS: dict[str, CallGraphDirection] = {
@@ -29,13 +35,20 @@ _DIRECTIONS: dict[str, CallGraphDirection] = {
 class ContextualCallGraphPanel(ttk.Frame):
     """Search and navigate bounded static call relationships."""
 
-    def __init__(self, master: Any) -> None:
+    def __init__(
+        self,
+        master: Any,
+        *,
+        on_open_flow: Callable[[str], None] | None = None,
+    ) -> None:
         super().__init__(master)
         self._analysis: ProjectAnalysis | None = None
         self._roots: tuple[CallGraphRoot, ...] = ()
         self._filtered_roots: tuple[CallGraphRoot, ...] = ()
         self._selected_root: CallGraphRoot | None = None
         self.current_result: ContextualCallGraph | None = None
+        self._on_open_flow = on_open_flow
+        self._detail_links: dict[str, str] = {}
 
         controls = ttk.Frame(self)
         controls.pack(fill="x", pady=(0, 8))
@@ -53,7 +66,7 @@ class ContextualCallGraphPanel(ttk.Frame):
         self.search_box.bind("<Return>", self._select_first_match)
 
         ttk.Label(controls, text="Direction").pack(side="left")
-        self.direction_variable = ttk.StringVar(value="Outgoing")
+        self.direction_variable = ttk.StringVar(value="Both")
         direction_box = ttk.Combobox(
             controls,
             textvariable=self.direction_variable,
@@ -65,7 +78,7 @@ class ContextualCallGraphPanel(ttk.Frame):
         direction_box.bind("<<ComboboxSelected>>", self._rebuild_event)
 
         ttk.Label(controls, text="Depth").pack(side="left")
-        self.depth_variable = ttk.StringVar(value="1")
+        self.depth_variable = ttk.StringVar(value=str(DEFAULT_CALL_DEPTH))
         depth_box = ttk.Combobox(
             controls,
             textvariable=self.depth_variable,
@@ -91,14 +104,51 @@ class ContextualCallGraphPanel(ttk.Frame):
             anchor="w",
         ).pack(fill="x")
 
+        body = ttk.Panedwindow(self, orient="horizontal")
+        body.pack(fill="both", expand=True)
+        graph_panel = ttk.Frame(body)
+        details_panel = ttk.Labelframe(body, text="Callable details", padding=10)
+        body.add(graph_panel, weight=4)
+        body.add(details_panel, weight=1)
         self.canvas = DependencyGraphCanvas(
-            self,
+            graph_panel,
+            on_select=self._show_node_details,
             on_activate=self._activate_node,
             node_label="callables",
             edge_label="calls",
             empty_message="Select a module or callable to display its call context.",
         )
         self.canvas.pack(fill="both", expand=True)
+        self.details_variable = ttk.StringVar(value="Select a callable.")
+        ttk.Label(
+            details_panel,
+            textvariable=self.details_variable,
+            justify="left",
+            anchor="nw",
+            wraplength=280,
+        ).pack(fill="x")
+        self.details_tree = ttk.Treeview(details_panel, show="tree", height=10)
+        self.details_tree.pack(fill="both", expand=True, pady=(8, 8))
+        self.details_tree.bind("<Double-Button-1>", self._activate_detail_link)
+        actions = ttk.Frame(details_panel)
+        actions.pack(fill="x")
+        ttk.Button(
+            actions,
+            text="Show Incoming",
+            command=lambda: self.set_direction("incoming"),
+        ).pack(side="left")
+        ttk.Button(
+            actions, text="Show Both", command=lambda: self.set_direction("both")
+        ).pack(side="left", padx=(5, 0))
+        self.flow_button = ttk.Button(
+            actions, text="Open Flow", command=self._open_selected_flow
+        )
+        self.flow_button.pack(side="right")
+        ttk.Label(
+            self,
+            text="Legend: → calls · double-click a node to make it the focus",
+            bootstyle="secondary",
+        ).pack(fill="x", pady=(6, 0))
 
     @property
     def selected_root(self) -> CallGraphRoot | None:
@@ -123,6 +173,18 @@ class ContextualCallGraphPanel(ttk.Frame):
             else "No project analysis"
         )
         self.call_diagnostics_variable.set("")
+        self.details_variable.set("Select a callable to inspect its neighborhood.")
+        self.details_tree.delete(*self.details_tree.get_children())
+        if analysis is not None and len(analysis.module_identities) == 1:
+            candidates = [
+                root
+                for root in self._roots
+                if root.kind == "callable" and root.label.endswith("::main")
+            ]
+            if not candidates:
+                candidates = [root for root in self._roots if root.kind == "callable"]
+            if candidates:
+                self.select_root(candidates[0].root_id)
 
     def search(self, query: str) -> tuple[CallGraphRoot, ...]:
         """Filter root choices and return the matching model objects."""
@@ -140,6 +202,8 @@ class ContextualCallGraphPanel(ttk.Frame):
         if root is None:
             return False
         self._selected_root = root
+        self.direction_variable.set("Both")
+        self.depth_variable.set("1")
         self.search_variable.set(root.label)
         self._rebuild()
         return True
@@ -214,6 +278,87 @@ class ContextualCallGraphPanel(ttk.Frame):
             f"Unresolved {diagnostics.unresolved_count} · "
             f"Dynamic {diagnostics.dynamic_count}"
         )
+        if result.root.kind == "callable":
+            self._render_details(result.root.root_id)
+        elif not result.graph.edges:
+            self.details_variable.set(
+                "This module has no resolved calls in the selected context."
+            )
+
+    def current_graph(self):
+        """Return the current logical call graph for export."""
+        return self.current_result.graph if self.current_result is not None else None
+
+    def _render_details(self, node_id: str) -> None:
+        if self._analysis is None:
+            return
+        details = callable_details(self._analysis, node_id)
+        if details is None:
+            return
+        parent = details.lexical_parent or "—"
+        message = "\n".join(
+            (
+                details.kind.title(),
+                f"{details.name}()",
+                "",
+                "Qualified name",
+                details.qualified_name,
+                "",
+                "Module",
+                details.module,
+                "",
+                "Source",
+                f"{details.path}:{details.line}",
+                "",
+                f"Lexical parent: {parent}",
+                f"Resolved references: {details.resolved_count}",
+                f"Ambiguous: {details.ambiguous_count}",
+                f"Unresolved: {details.unresolved_count}",
+                f"Dynamic: {details.dynamic_count}",
+            )
+        )
+        suggestion = empty_outgoing_suggestion(
+            len(details.incoming), _DIRECTIONS[self.direction_variable.get()]
+        )
+        if not details.outgoing and suggestion:
+            message += f"\n\n{suggestion}"
+        self.details_variable.set(message)
+        self.details_tree.delete(*self.details_tree.get_children())
+        self._detail_links.clear()
+        incoming_root = self.details_tree.insert(
+            "", "end", text=f"Called by ({len(details.incoming)})", open=True
+        )
+        outgoing_root = self.details_tree.insert(
+            "", "end", text=f"Calls ({len(details.outgoing)})", open=True
+        )
+        for target_id, label in details.incoming:
+            item = self.details_tree.insert(
+                incoming_root, "end", text=f"← {self._relationship_label(label)}"
+            )
+            self._detail_links[item] = target_id
+        for target_id, label in details.outgoing:
+            item = self.details_tree.insert(
+                outgoing_root, "end", text=f"→ {self._relationship_label(label)}"
+            )
+            self._detail_links[item] = target_id
+
+    @staticmethod
+    def _relationship_label(qualified_name: str) -> str:
+        local_name = qualified_name.partition("::")[2] or qualified_name
+        return local_name if local_name == "<module>" else f"{local_name}()"
+
+    def _show_node_details(self, node: GraphNode) -> None:
+        self._render_details(node.node_id)
+
+    def _activate_detail_link(self, _event: object) -> None:
+        selected = self.details_tree.selection()
+        if selected and selected[0] in self._detail_links:
+            self.select_root(self._detail_links[selected[0]])
+
+    def _open_selected_flow(self) -> None:
+        root = self._selected_root
+        if root is not None and root.kind == "callable" and self._on_open_flow:
+            self._on_open_flow(root.root_id)
 
     def _activate_node(self, node: GraphNode) -> None:
         self.select_root(node.node_id)

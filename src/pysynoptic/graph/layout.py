@@ -6,7 +6,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from pysynoptic.models import ModuleDependency, ModuleIdentity, ProjectAnalysis
+from pysynoptic.models import (
+    CallableFlowGraph,
+    ModuleDependency,
+    ModuleIdentity,
+    ProjectAnalysis,
+)
 
 _HORIZONTAL_GAP = 110.0
 _VERTICAL_GAP = 34.0
@@ -23,6 +28,10 @@ class GraphNode:
     node_id: str
     label: str
     path: Path
+    cyclic: bool = False
+    kind: str = ""
+    line: int = 0
+    column: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +40,7 @@ class GraphEdge:
 
     source_id: str
     target_id: str
+    label: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +85,20 @@ class GraphLayout:
         )
 
 
+def graph_readability_message(
+    graph: DependencyGraph, *, threshold: int = 80
+) -> str | None:
+    """Return focused-navigation guidance for an explicitly large graph."""
+    if threshold < 1:
+        raise ValueError("Graph readability threshold must be positive")
+    if len(graph.nodes) <= threshold:
+        return None
+    return (
+        f"Large graph ({len(graph.nodes)} nodes): select a module/callable or "
+        "reduce depth for a readable view."
+    )
+
+
 def _node_sort_key(node: GraphNode) -> tuple[str, str, str]:
     return (node.label.casefold(), node.label, node.path.as_posix())
 
@@ -102,6 +126,7 @@ def build_dependency_graph(
         GraphEdge(
             source_id=dependency.source.path.as_posix(),
             target_id=dependency.target.path.as_posix(),
+            label="imports",
         )
         for dependency in dependencies
         if dependency.source.path.as_posix() in known_ids
@@ -338,3 +363,125 @@ def layout_dependency_graph(analysis: ProjectAnalysis) -> GraphLayout:
     """Build and position every project module for Canvas rendering."""
     graph = build_dependency_graph(analysis.module_identities, analysis.dependencies)
     return layout_graph(graph)
+
+
+def build_function_flow_graph(flow: CallableFlowGraph) -> DependencyGraph:
+    """Convert one static function CFG to the shared logical graph model."""
+    return DependencyGraph(
+        nodes=tuple(
+            GraphNode(
+                node_id=node.node_id,
+                label=node.label,
+                path=flow.path,
+                kind=node.kind,
+                line=node.line,
+                column=node.column,
+            )
+            for node in flow.nodes
+        ),
+        edges=tuple(
+            GraphEdge(edge.source_id, edge.target_id, edge.label) for edge in flow.edges
+        ),
+    )
+
+
+def layout_vertical_graph(graph: DependencyGraph) -> GraphLayout:
+    """Lay graph layers from top to bottom for readable control flow."""
+    if graph.nodes and any(node.kind for node in graph.nodes):
+        return _layout_source_order_flow(graph)
+    horizontal = layout_graph(graph)
+    if not horizontal.nodes:
+        return horizontal
+
+    layers: dict[int, list[PositionedNode]] = {}
+    for node in horizontal.nodes:
+        layers.setdefault(node.layer, []).append(node)
+    for nodes in layers.values():
+        nodes.sort(key=lambda item: (item.y, _node_sort_key(item.node)))
+
+    row_gap = 76.0
+    node_gap = 52.0
+    row_widths = {
+        layer: sum(node.width for node in nodes) + max(0, len(nodes) - 1) * node_gap
+        for layer, nodes in layers.items()
+    }
+    content_width = max(row_widths.values())
+    positioned: list[PositionedNode] = []
+    y = _MARGIN
+    for layer in sorted(layers):
+        nodes = layers[layer]
+        x = _MARGIN + (content_width - row_widths[layer]) / 2
+        row_height = max(node.height for node in nodes)
+        for node in nodes:
+            positioned.append(
+                PositionedNode(
+                    node=node.node,
+                    x=x,
+                    y=y,
+                    width=node.width,
+                    height=node.height,
+                    layer=node.layer,
+                    component=node.component,
+                )
+            )
+            x += node.width + node_gap
+        y += row_height + row_gap
+    return GraphLayout(
+        nodes=tuple(sorted(positioned, key=lambda item: _node_sort_key(item.node))),
+        edges=horizontal.edges,
+        components=horizontal.components,
+        layer_count=horizontal.layer_count,
+        width=content_width + 2 * _MARGIN,
+        height=y - row_gap + _MARGIN,
+    )
+
+
+def _layout_source_order_flow(graph: DependencyGraph) -> GraphLayout:
+    """Place CFG nodes in source order while retaining loop-back SCC metadata."""
+    kind_order = {"entry": -1, "exit": 2}
+    ordered = sorted(
+        graph.nodes,
+        key=lambda node: (
+            kind_order.get(node.kind, 0),
+            node.line if node.kind != "exit" else float("inf"),
+            node.column,
+            node.node_id,
+        ),
+    )
+    components = strongly_connected_components(graph)
+    component_by_node = {
+        node_id: index
+        for index, component in enumerate(components)
+        for node_id in component
+    }
+    row_gap = 24.0
+    indent_width = 12.0
+    loop_gutter = 100.0
+    positioned = []
+    y = _MARGIN
+    content_right = 0.0
+    for layer, node in enumerate(ordered):
+        width = _node_width(node.label)
+        indentation = min(220.0, node.column * indent_width)
+        x = _MARGIN + loop_gutter + indentation
+        positioned.append(
+            PositionedNode(
+                node=node,
+                x=x,
+                y=y,
+                width=width,
+                height=_NODE_HEIGHT,
+                layer=layer,
+                component=component_by_node[node.node_id],
+            )
+        )
+        content_right = max(content_right, x + width)
+        y += _NODE_HEIGHT + row_gap
+    return GraphLayout(
+        nodes=tuple(positioned),
+        edges=graph.edges,
+        components=components,
+        layer_count=len(positioned),
+        width=content_right + _MARGIN,
+        height=y - row_gap + _MARGIN,
+    )

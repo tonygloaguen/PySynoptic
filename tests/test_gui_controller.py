@@ -96,7 +96,8 @@ def test_analyzes_single_file(tmp_path: Path) -> None:
     assert state.file_analysis is not None
     assert state.file_analysis.functions == ("run",)
     assert state.file_analysis.imports == ("os",)
-    assert state.project_analysis is None
+    assert state.project_analysis is not None
+    assert len(state.project_analysis.callable_identities) == 1
     assert state.status_message == "File analysis complete."
 
 
@@ -123,7 +124,7 @@ def test_analyzes_project_and_prepares_all_views(tmp_path: Path) -> None:
     assert len(state.project_analysis.module_identities) == 2
     assert len(state.project_analysis.dependencies) == 1
     assert "flowchart LR" in state.mermaid_source
-    assert "module_source --> module_target" in state.mermaid_source
+    assert "module_source -->|imports| module_target" in state.mermaid_source
     assert state.status_message == "Project analysis complete."
 
 

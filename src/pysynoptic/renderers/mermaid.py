@@ -7,9 +7,11 @@ import re
 from pathlib import Path
 from typing import Literal, TypeAlias
 
+from pysynoptic.graph.layout import DependencyGraph
 from pysynoptic.models import ModuleIdentity, ProjectAnalysis
 
 MermaidDirection: TypeAlias = Literal["BT", "LR", "RL", "TB", "TD"]
+MermaidExportMode: TypeAlias = Literal["architecture", "calls", "flow", "whole"]
 _DIRECTIONS = frozenset({"BT", "LR", "RL", "TB", "TD"})
 _UNSAFE_IDENTIFIER = re.compile(r"[^A-Za-z0-9_]")
 
@@ -104,10 +106,54 @@ def render_mermaid(
     )
     for dependency in dependencies:
         lines.append(
-            f"  {node_ids[dependency.source.path]} --> "
+            f"  {node_ids[dependency.source.path]} -->|imports| "
             f"{node_ids[dependency.target.path]}"
         )
     return "\n".join(lines) + "\n"
+
+
+def render_graph_mermaid(
+    graph: DependencyGraph,
+    *,
+    direction: MermaidDirection = "TD",
+) -> str:
+    """Render the current renderer-independent graph with labeled edges."""
+    if direction not in _DIRECTIONS:
+        raise ValueError(f"Unsupported Mermaid direction: {direction}")
+    identifiers = {
+        node.node_id: f"node_{hashlib.sha256(node.node_id.encode()).hexdigest()[:12]}"
+        for node in graph.nodes
+    }
+    lines = [f"flowchart {direction}"]
+    for node in sorted(
+        graph.nodes, key=lambda item: (item.label.casefold(), item.label, item.node_id)
+    ):
+        lines.append(f'  {identifiers[node.node_id]}["{_escape_label(node.label)}"]')
+    for edge in sorted(
+        graph.edges,
+        key=lambda item: (item.source_id, item.target_id, item.label),
+    ):
+        label = _escape_label(edge.label or "relates")
+        lines.append(
+            f"  {identifiers[edge.source_id]} -->|{label}| "
+            f"{identifiers[edge.target_id]}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def render_mermaid_export(
+    mode: MermaidExportMode,
+    analysis: ProjectAnalysis,
+    current_graph: DependencyGraph | None = None,
+) -> str:
+    """Render one explicit GUI export mode without depending on Tk widgets."""
+    if mode == "whole":
+        return render_mermaid(analysis)
+    if mode not in {"architecture", "calls", "flow"}:
+        raise ValueError(f"Unsupported Mermaid export mode: {mode}")
+    if current_graph is None:
+        raise ValueError(f"No current {mode} graph to export")
+    return render_graph_mermaid(current_graph)
 
 
 def write_mermaid(

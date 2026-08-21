@@ -39,4 +39,4 @@ def test_package_workflow_targets_windows_and_linux_onedir_artifacts() -> None:
     assert "Start-Process" in workflow
     assert "actions/upload-artifact@v7" in workflow
     assert 'archive="PySynoptic-v${version}-' in workflow
-    assert __version__ == "0.0.10"
+    assert __version__ == "0.0.11"
