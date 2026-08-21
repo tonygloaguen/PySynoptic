@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pysynoptic"
-version = "0.0.5"
+version = "0.0.6"
 description = "Static structural analysis for Python source code"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,7 +20,9 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+    "ttkbootstrap>=1.10,<2",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -30,6 +32,7 @@ dev = [
 
 [project.scripts]
 pysynoptic = "pysynoptic.cli:main"
+pysynoptic-gui = "pysynoptic.gui:main"
 
 [tool.pytest.ini_options]
 addopts = "-ra"

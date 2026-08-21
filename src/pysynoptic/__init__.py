@@ -23,4 +23,4 @@ __all__ = [
     "render_mermaid",
     "write_mermaid",
 ]
-__version__ = "0.0.5"
+__version__ = "0.0.6"

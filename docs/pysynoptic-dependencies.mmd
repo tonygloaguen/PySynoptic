@@ -8,6 +8,11 @@ flowchart LR
     module_pysynoptic_analyzer_project["pysynoptic.analyzer.project"]
     module_pysynoptic_analyzer_python_file["pysynoptic.analyzer.python_file"]
     module_pysynoptic_cli["pysynoptic.cli"]
+    module_pysynoptic_gui["pysynoptic.gui"]
+    module_pysynoptic_gui___main["pysynoptic.gui.__main__"]
+    module_pysynoptic_gui_app["pysynoptic.gui.app"]
+    module_pysynoptic_gui_controller["pysynoptic.gui.controller"]
+    module_pysynoptic_gui_state["pysynoptic.gui.state"]
     module_pysynoptic_models["pysynoptic.models"]
     module_pysynoptic_models_analysis["pysynoptic.models.analysis"]
     module_pysynoptic_models_imports["pysynoptic.models.imports"]
@@ -21,6 +26,7 @@ flowchart LR
   subgraph package_tests["tests"]
     module_tests["tests"]
     module_tests_test_cli["tests.test_cli"]
+    module_tests_test_gui_controller["tests.test_gui_controller"]
     module_tests_test_import_metadata["tests.test_import_metadata"]
     module_tests_test_import_resolution["tests.test_import_resolution"]
     module_tests_test_mermaid_renderer["tests.test_mermaid_renderer"]
@@ -54,6 +60,16 @@ flowchart LR
   module_pysynoptic_cli --> module_pysynoptic_models_analysis
   module_pysynoptic_cli --> module_pysynoptic_models_project
   module_pysynoptic_cli --> module_pysynoptic_renderers_mermaid
+  module_pysynoptic_gui --> module_pysynoptic_gui_app
+  module_pysynoptic_gui___main --> module_pysynoptic_gui
+  module_pysynoptic_gui_app --> module_pysynoptic_gui_controller
+  module_pysynoptic_gui_app --> module_pysynoptic_gui_state
+  module_pysynoptic_gui_controller --> module_pysynoptic_analyzer_project
+  module_pysynoptic_gui_controller --> module_pysynoptic_analyzer_python_file
+  module_pysynoptic_gui_controller --> module_pysynoptic_gui_state
+  module_pysynoptic_gui_controller --> module_pysynoptic_renderers_mermaid
+  module_pysynoptic_gui_state --> module_pysynoptic_models_analysis
+  module_pysynoptic_gui_state --> module_pysynoptic_models_project
   module_pysynoptic_models --> module_pysynoptic_models_analysis
   module_pysynoptic_models --> module_pysynoptic_models_imports
   module_pysynoptic_models --> module_pysynoptic_models_project
@@ -67,6 +83,8 @@ flowchart LR
   module_pysynoptic_scanner_project_scanner --> module_pysynoptic_models_project
   module_pysynoptic_scanner_project_scanner --> module_pysynoptic_scanner_exclusions
   module_tests_test_cli --> module_pysynoptic_cli
+  module_tests_test_gui_controller --> module_pysynoptic_gui_controller
+  module_tests_test_gui_controller --> module_pysynoptic_gui_state
   module_tests_test_import_metadata --> module_pysynoptic_analyzer_python_file
   module_tests_test_import_metadata --> module_pysynoptic_models_imports
   module_tests_test_import_resolution --> module_pysynoptic_analyzer_project

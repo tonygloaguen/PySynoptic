@@ -14,8 +14,9 @@ project.
 
 ## Current capabilities
 
-Version `0.0.5` analyzes either one `.py` file or a complete directory tree. It
-reports:
+Version `0.0.6` provides both the established command-line interface and a
+first desktop interface. It analyzes either one `.py` file or a complete
+directory tree and reports:
 
 - the file path and inferred module name;
 - top-level synchronous and asynchronous functions;
@@ -30,6 +31,12 @@ reports:
 - deterministic Mermaid flowcharts generated directly from project analyses;
 - non-Python project resources grouped by broad type;
 - excluded paths and recoverable filesystem or source-reading errors.
+
+The desktop application lets the user select a Python file or project, start
+the same static analysis used by the CLI, browse the discovered project tree,
+inspect a summary and resolved module dependencies, view the generated Mermaid
+source, and export it as an `.mmd` file. GUI orchestration remains separate from
+the scanner, analyzer, models, and renderer.
 
 Common generated, environment, dependency, and cache directories such as
 `.git`, `.venv`, `__pycache__`, `node_modules`, `build`, and `dist` are excluded
@@ -69,6 +76,29 @@ ruff check .
 ruff format --check .
 python -m compileall src
 ```
+
+## Desktop application
+
+Launch the interface through its dedicated entry point:
+
+```bash
+pysynoptic-gui
+```
+
+or directly as a Python module:
+
+```bash
+python -m pysynoptic.gui
+```
+
+Use **Open Python File** for a single source file or **Open Project** for a
+directory, then select **Analyze**. Project analyses populate the project tree
+and the **Overview**, **Dependencies**, and **Mermaid** tabs. **Export Mermaid**
+becomes available after a project analysis.
+
+The desktop layer uses `ttkbootstrap` for native Tk widgets and styling. It
+delegates all analysis and rendering to the existing public engine APIs; it
+does not execute or import selected source code.
 
 ## CLI usage
 
@@ -138,6 +168,11 @@ AST metadata and emits a logical dependency graph as immutable Python data.
 The Mermaid renderer consumes only this completed `ProjectAnalysis`; it never
 reads or imports analyzed source code.
 
+The desktop layer follows the same boundary. Its immutable application state
+contains the selected target and completed analysis values, while a small
+controller coordinates the existing public APIs. Tk widgets are responsible
+only for file dialogs and presenting that state.
+
 ## Generated architecture diagram
 
 PySynoptic generates its own dependency diagram at
@@ -154,6 +189,10 @@ a stable order suitable for version control and exact-string testing.
 - fileless namespace packages do not produce dependency edges themselves;
 - function calls are not resolved;
 - Mermaid output currently supports module dependencies only;
+- analysis runs synchronously in the desktop application, so very large
+  projects can temporarily block the interface;
+- Mermaid is displayed and exported as source text, without an embedded visual
+  preview;
 - resources are catalogued but not linked to Python code;
 - symbolic links are excluded rather than followed;
 - source roots configured through packaging metadata are not yet interpreted;
@@ -161,10 +200,16 @@ a stable order suitable for version control and exact-string testing.
 
 ## Short roadmap
 
-1. Add JSON export for file and project analyses.
-2. Model function and method calls on top of the stable module graph.
-3. Add graph filtering and visual styles for dependency categories.
-4. Build an interactive visualization layer on top of the independent engine.
+- `0.0.1`: single-file static analysis.
+- `0.0.2`: recursive project analysis.
+- `0.0.3`: project-aware module identities.
+- `0.0.4`: static import resolution.
+- `0.0.5`: deterministic Mermaid export.
+- `0.0.6`: first usable desktop GUI.
+- `0.0.7`: navigable graphical preview.
+- `0.0.8`: function inventory and call graph.
+- `0.0.9`: interface polish and packaging.
+- `0.1.0`: first public release.
 
 ## License
 
