@@ -1,5 +1,7 @@
 # PySynoptic
 
+[![CI](https://github.com/tonygloaguen/PySynoptic/actions/workflows/ci.yml/badge.svg)](https://github.com/tonygloaguen/PySynoptic/actions/workflows/ci.yml)
+
 PySynoptic is an open-source static analysis tool for exploring the structure of
 Python source code. Its long-term goal is to turn a file or a project into a
 clear, navigable synopsis of modules, declarations, and their relationships.
