@@ -3,7 +3,11 @@ from pathlib import Path
 import pytest
 
 from pysynoptic.gui.controller import ApplicationController
-from pysynoptic.gui.state import ApplicationState
+from pysynoptic.gui.state import (
+    ApplicationState,
+    controls_for_state,
+    mark_analysis_started,
+)
 
 
 def write_python(path: Path, source: str = "") -> Path:
@@ -21,6 +25,20 @@ def test_initial_application_state_is_empty() -> None:
     assert state.project_analysis is None
     assert state.mermaid_source == ""
     assert state.error_message is None
+    assert state.is_analyzing is False
+
+
+def test_analysis_pending_state_disables_mutating_controls(tmp_path: Path) -> None:
+    selected = ApplicationController().select_path(tmp_path)
+
+    pending = mark_analysis_started(selected)
+    controls = controls_for_state(pending)
+
+    assert pending.is_analyzing is True
+    assert pending.status_message == f"Analyzing project: {tmp_path}"
+    assert controls.can_select is False
+    assert controls.can_analyze is False
+    assert controls.can_export is False
 
 
 def test_selects_python_file(tmp_path: Path) -> None:

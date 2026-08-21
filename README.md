@@ -137,6 +137,13 @@ and the **Overview**, **Graph**, **Call Graph**, **Dependencies**, and
 **Mermaid** tabs. **Export Mermaid** becomes available after a project
 analysis.
 
+Analysis runs on a background daemon worker so filesystem scanning, AST parsing,
+import resolution, and conservative call resolution do not block Tk's event
+loop. While work is pending, project-selection, analysis, and export controls
+are disabled, the status bar identifies the active target, and the notebook
+remains responsive. Only the newest submitted generation may update the GUI;
+late results from an earlier selection are discarded.
+
 In the **Graph** tab, drag an empty area to pan, use the mouse wheel or `+` and
 `−` controls to zoom, and select **Fit** to restore the complete view. Selecting
 a node emphasizes both incoming and outgoing dependencies while muting the
@@ -230,8 +237,11 @@ reads or imports analyzed source code.
 
 The desktop layer follows the same boundary. Its immutable application state
 contains the selected target and completed analysis values, while a small
-controller coordinates the existing public APIs. A deterministic pure-Python
-layout condenses strongly connected components, layers the resulting DAG, and
+controller coordinates the existing public APIs. A headless-safe background
+runner invokes that controller on daemon threads and returns immutable states
+through a generation-tagged queue; Tk polls the queue with `after()` and remains
+the only thread that touches widgets. A deterministic pure-Python layout
+condenses strongly connected components, layers the resulting DAG, and
 positions any logical graph. Module dependencies and contextual call
 dependencies have separate pure builders but share that layout. The native Tk
 Canvas consumes only positioned values and owns viewport transforms, drawing,
@@ -263,8 +273,9 @@ a stable order suitable for version control and exact-string testing.
 - module roots can still produce a wide context in modules that declare many
   callables;
 - Mermaid output currently supports module dependencies only;
-- analysis runs synchronously in the desktop application, so very large
-  projects can temporarily block the interface;
+- building the project tree and initial module layout still occurs on the GUI
+  thread after analysis, so presenting an exceptionally large completed result
+  can cause a short pause;
 - the dependency layout is optimized for small and medium projects and does
   not yet provide filtering or package collapsing;
 - Mermaid is displayed and exported as source text, without an embedded visual

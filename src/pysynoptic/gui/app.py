@@ -10,10 +10,15 @@ from tkinter.scrolledtext import ScrolledText
 import ttkbootstrap as ttk
 
 from pysynoptic.graph import layout_dependency_graph
+from pysynoptic.gui.analysis_runner import AnalysisRunner
 from pysynoptic.gui.call_graph import ContextualCallGraphPanel
 from pysynoptic.gui.controller import ApplicationController
 from pysynoptic.gui.graph_canvas import DependencyGraphCanvas
-from pysynoptic.gui.state import ApplicationState
+from pysynoptic.gui.state import (
+    ApplicationState,
+    controls_for_state,
+    mark_analysis_started,
+)
 from pysynoptic.models import ProjectAnalysis
 
 
@@ -26,10 +31,13 @@ class PySynopticApp(ttk.Window):
         self.state = ApplicationState()
         self._graph_analysis: ProjectAnalysis | None = None
         self._tree_graph_nodes: dict[str, str] = {}
+        self._analysis_runner = AnalysisRunner(self.controller.analyze)
+        self._analysis_poll_id: str | None = None
 
         self.title("PySynoptic")
         self.geometry("1180x760")
         self.minsize(900, 600)
+        self.protocol("WM_DELETE_WINDOW", self._close_application)
 
         self._build_toolbar()
         self._build_workspace()
@@ -40,18 +48,20 @@ class PySynopticApp(ttk.Window):
         toolbar = ttk.Frame(self, padding=(12, 10))
         toolbar.pack(fill="x")
 
-        ttk.Button(
+        self.open_file_button = ttk.Button(
             toolbar,
             text="Open Python File",
             command=self.open_python_file,
             bootstyle="secondary",
-        ).pack(side="left", padx=(0, 8))
-        ttk.Button(
+        )
+        self.open_file_button.pack(side="left", padx=(0, 8))
+        self.open_project_button = ttk.Button(
             toolbar,
             text="Open Project",
             command=self.open_project,
             bootstyle="secondary",
-        ).pack(side="left", padx=(0, 8))
+        )
+        self.open_project_button.pack(side="left", padx=(0, 8))
         self.analyze_button = ttk.Button(
             toolbar,
             text="Analyze",
@@ -152,15 +162,47 @@ class PySynopticApp(ttk.Window):
             self._select_path(Path(selected))
 
     def _select_path(self, path: Path) -> None:
+        self._analysis_runner.invalidate()
         self.state = self.controller.select_path(path)
         self._render_state()
         self._show_state_error()
 
     def analyze_selected(self) -> None:
-        """Analyze the current selection synchronously and refresh all views."""
-        self.state = self.controller.analyze(self.state)
+        """Submit the current selection for background static analysis."""
+        if self.state.selected_path is None or self.state.target_kind is None:
+            self.state = self.controller.analyze(self.state)
+            self._render_state()
+            self._show_state_error()
+            return
+        if self.state.is_analyzing:
+            return
+
+        request_state = replace(self.state, is_analyzing=False)
+        self._analysis_runner.submit(request_state)
+        self.state = mark_analysis_started(self.state)
         self._render_state()
-        self._show_state_error()
+        self._schedule_analysis_poll()
+
+    def _schedule_analysis_poll(self) -> None:
+        if self._analysis_poll_id is None:
+            self._analysis_poll_id = self.after(25, self._poll_analysis)
+
+    def _poll_analysis(self) -> None:
+        self._analysis_poll_id = None
+        completed = self._analysis_runner.poll_latest()
+        if completed is not None:
+            self.state = completed
+            self._render_state()
+            self._show_state_error()
+        elif self.state.is_analyzing:
+            self._schedule_analysis_poll()
+
+    def _close_application(self) -> None:
+        if self._analysis_poll_id is not None:
+            self.after_cancel(self._analysis_poll_id)
+            self._analysis_poll_id = None
+        self._analysis_runner.shutdown()
+        self.destroy()
 
     def export_mermaid(self) -> None:
         """Prompt for a destination and export the current project graph."""
@@ -195,12 +237,16 @@ class PySynopticApp(ttk.Window):
             )
 
     def _render_state(self) -> None:
+        controls = controls_for_state(self.state)
+        selection_state = "normal" if controls.can_select else "disabled"
+        self.open_file_button.configure(state=selection_state)
+        self.open_project_button.configure(state=selection_state)
         self.status_variable.set(self.state.status_message)
         self.analyze_button.configure(
-            state="normal" if self.state.target_kind else "disabled"
+            state="normal" if controls.can_analyze else "disabled"
         )
         self.export_button.configure(
-            state="normal" if self.state.project_analysis else "disabled"
+            state="normal" if controls.can_export else "disabled"
         )
         self._render_tree()
         self._render_graph()

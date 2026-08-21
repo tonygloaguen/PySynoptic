@@ -43,7 +43,12 @@ class ApplicationController:
         """Analyze the currently selected target without executing source."""
         if state.selected_path is None or state.target_kind is None:
             message = "Choose a Python file or project before analyzing."
-            return replace(state, status_message=message, error_message=message)
+            return replace(
+                state,
+                is_analyzing=False,
+                status_message=message,
+                error_message=message,
+            )
 
         try:
             if state.target_kind == "file":
@@ -59,6 +64,7 @@ class ApplicationController:
                     file_analysis=analysis,
                     project_analysis=None,
                     mermaid_source="",
+                    is_analyzing=False,
                     status_message=status,
                     error_message=None,
                 )
@@ -78,12 +84,18 @@ class ApplicationController:
                 file_analysis=None,
                 project_analysis=analysis,
                 mermaid_source=render_mermaid(analysis),
+                is_analyzing=False,
                 status_message=status,
                 error_message=None,
             )
         except (OSError, ValueError) as error:
             message = f"Analysis failed: {error}"
-            return replace(state, status_message=message, error_message=message)
+            return replace(
+                state,
+                is_analyzing=False,
+                status_message=message,
+                error_message=message,
+            )
 
     def export_mermaid(self, state: ApplicationState, output_path: Path) -> Path:
         """Export the current project graph or raise a clear usage error."""
