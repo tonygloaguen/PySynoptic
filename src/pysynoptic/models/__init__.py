@@ -11,8 +11,11 @@ from pysynoptic.models.project import (
     ProjectResource,
     ProjectScan,
 )
+from pysynoptic.models.symbols import CallableSymbol, CallReference
 
 __all__ = [
+    "CallReference",
+    "CallableSymbol",
     "FileAnalysis",
     "ImportReference",
     "ImportResolution",
