@@ -260,9 +260,8 @@ def _node_width(label: str) -> float:
     return max(_MIN_NODE_WIDTH, min(_MAX_NODE_WIDTH, 30.0 + len(label) * 7.2))
 
 
-def layout_dependency_graph(analysis: ProjectAnalysis) -> GraphLayout:
-    """Build and position every project module for Canvas rendering."""
-    graph = build_dependency_graph(analysis.module_identities, analysis.dependencies)
+def layout_graph(graph: DependencyGraph) -> GraphLayout:
+    """Position any renderer-independent directed graph deterministically."""
     if not graph.nodes:
         return GraphLayout((), graph.edges, (), 0, 0.0, 0.0)
 
@@ -333,3 +332,9 @@ def layout_dependency_graph(analysis: ProjectAnalysis) -> GraphLayout:
         width=width,
         height=height,
     )
+
+
+def layout_dependency_graph(analysis: ProjectAnalysis) -> GraphLayout:
+    """Build and position every project module for Canvas rendering."""
+    graph = build_dependency_graph(analysis.module_identities, analysis.dependencies)
+    return layout_graph(graph)

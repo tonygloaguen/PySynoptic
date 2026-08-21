@@ -16,7 +16,7 @@ project.
 
 ## Current capabilities
 
-Version `0.0.9` provides both the established command-line interface and an
+Version `0.0.10` provides both the established command-line interface and an
 interactive desktop interface. It analyzes either one `.py` file or a complete
 directory tree and reports:
 
@@ -29,6 +29,7 @@ directory tree and reports:
 - conservative resolved, ambiguous, unresolved, and dynamic call results;
 - deterministic callable dependencies derived only from confidently resolved
   calls;
+- contextual, interactive call graphs bounded by root, direction, and depth;
 - structured `import x` and `from x import y` metadata from every lexical
   scope, including aliases, relative levels, and source positions;
 - syntax errors with their source location;
@@ -42,10 +43,10 @@ directory tree and reports:
 
 The desktop application lets the user select a Python file or project, start
 the same static analysis used by the CLI, browse the discovered project tree,
-navigate a native interactive dependency graph, inspect a summary and resolved
-module dependencies, view the generated Mermaid source, and export it as an
-`.mmd` file. GUI orchestration remains separate from the scanner, analyzer,
-models, layout, and Canvas renderer.
+navigate native interactive module and contextual call graphs, inspect a
+summary and resolved module dependencies, view the generated Mermaid source,
+and export it as an `.mmd` file. GUI orchestration remains separate from the
+scanner, analyzer, models, layout, and Canvas renderer.
 
 Common generated, environment, dependency, and cache directories such as
 `.git`, `.venv`, `__pycache__`, `node_modules`, `build`, and `dist` are excluded
@@ -132,14 +133,28 @@ python -m pysynoptic.gui
 
 Use **Open Python File** for a single source file or **Open Project** for a
 directory, then select **Analyze**. Project analyses populate the project tree
-and the **Overview**, **Graph**, **Dependencies**, and **Mermaid** tabs.
-**Export Mermaid** becomes available after a project analysis.
+and the **Overview**, **Graph**, **Call Graph**, **Dependencies**, and
+**Mermaid** tabs. **Export Mermaid** becomes available after a project
+analysis.
 
 In the **Graph** tab, drag an empty area to pan, use the mouse wheel or `+` and
 `−` controls to zoom, and select **Fit** to restore the complete view. Selecting
 a node emphasizes both incoming and outgoing dependencies while muting the
 rest of the graph. Selecting a Python module in the project tree opens the
 graph, selects the matching node, and centers it in the viewport.
+
+The **Call Graph** tab deliberately displays a bounded context instead of the
+complete project's call-reference set. Search for a module or a fully qualified
+callable, choose **Outgoing**, **Incoming**, or **Both**, then select a depth of
+one, two, or three relationships. Changing either control rebuilds the pure
+logical subgraph before passing it through the same layout and Canvas used by
+the module graph. Double-click a visible callable to make it the new root.
+
+The diagnostics panel distinguishes the number of visible nodes and edges from
+the selected root's direct incoming and outgoing dependencies. It also reports
+resolved, ambiguous, unresolved, and dynamic references attributed to that
+root. A module root groups its module-level references and all declared
+callables in the module; a callable root focuses on one declaration.
 
 The desktop layer uses `ttkbootstrap` for native Tk widgets and styling. It
 delegates all analysis and rendering to the existing public engine APIs; it
@@ -217,9 +232,11 @@ The desktop layer follows the same boundary. Its immutable application state
 contains the selected target and completed analysis values, while a small
 controller coordinates the existing public APIs. A deterministic pure-Python
 layout condenses strongly connected components, layers the resulting DAG, and
-positions every module. The native Tk Canvas consumes only those positioned
-values and owns viewport transforms, drawing, and selection. Tk widgets remain
-responsible only for file dialogs and presenting completed state.
+positions any logical graph. Module dependencies and contextual call
+dependencies have separate pure builders but share that layout. The native Tk
+Canvas consumes only positioned values and owns viewport transforms, drawing,
+selection, and activation. Tk widgets remain responsible only for file dialogs
+and presenting completed state.
 
 ## Generated architecture diagram
 
@@ -241,7 +258,10 @@ a stable order suitable for version control and exact-string testing.
   attempting statement-order analysis;
 - lambdas and other anonymous callable expressions do not receive symbol
   identities;
-- callable dependencies are available as data but do not yet have a GUI view;
+- call-graph navigation shows only conservative resolved dependencies and does
+  not visualize unresolved or dynamic expressions as speculative edges;
+- module roots can still produce a wide context in modules that declare many
+  callables;
 - Mermaid output currently supports module dependencies only;
 - analysis runs synchronously in the desktop application, so very large
   projects can temporarily block the interface;

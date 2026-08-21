@@ -10,6 +10,7 @@ from tkinter.scrolledtext import ScrolledText
 import ttkbootstrap as ttk
 
 from pysynoptic.graph import layout_dependency_graph
+from pysynoptic.gui.call_graph import ContextualCallGraphPanel
 from pysynoptic.gui.controller import ApplicationController
 from pysynoptic.gui.graph_canvas import DependencyGraphCanvas
 from pysynoptic.gui.state import ApplicationState
@@ -95,6 +96,7 @@ class PySynopticApp(ttk.Window):
         self.notebook.pack(fill="both", expand=True)
         self.overview_text = self._add_text_tab("Overview")
         self._add_graph_tab()
+        self._add_call_graph_tab()
         self.dependencies_text = self._add_text_tab("Dependencies")
         self.mermaid_text = self._add_text_tab("Mermaid", fixed_width=True)
 
@@ -103,6 +105,10 @@ class PySynopticApp(ttk.Window):
         self.graph_canvas = DependencyGraphCanvas(self.graph_panel)
         self.graph_canvas.pack(fill="both", expand=True)
         self.notebook.add(self.graph_panel, text="Graph")
+
+    def _add_call_graph_tab(self) -> None:
+        self.call_graph_panel = ContextualCallGraphPanel(self.notebook)
+        self.notebook.add(self.call_graph_panel, text="Call Graph")
 
     def _add_text_tab(self, label: str, *, fixed_width: bool = False) -> ScrolledText:
         panel = ttk.Frame(self.notebook, padding=8)
@@ -198,6 +204,7 @@ class PySynopticApp(ttk.Window):
         )
         self._render_tree()
         self._render_graph()
+        self.call_graph_panel.set_analysis(self.state.project_analysis)
         self._set_text(self.overview_text, self._overview_content())
         self._set_text(self.dependencies_text, self._dependencies_content())
         self._set_text(
