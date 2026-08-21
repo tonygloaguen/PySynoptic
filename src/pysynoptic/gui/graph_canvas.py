@@ -19,6 +19,10 @@ _SELECTED = "#0d6efd"
 _NEIGHBOR = "#dcecff"
 _HIGHLIGHT_EDGE = "#0d6efd"
 _MUTED = "#d7dde5"
+_CYCLE = "#f59f00"
+_CYCLE_FILL = "#fff3bf"
+_BRANCH_FILL = "#e7f5ff"
+_TERMINAL_FILL = "#e6fcf5"
 
 
 class DependencyGraphCanvas(ttk.Frame):
@@ -33,6 +37,8 @@ class DependencyGraphCanvas(ttk.Frame):
         node_label: str = "modules",
         edge_label: str = "dependencies",
         empty_message: str = "Analyze a project to display its dependency graph.",
+        minimum_fit_scale: float = 0.2,
+        mute_unselected: bool = True,
     ) -> None:
         super().__init__(master)
         self._layout: GraphLayout | None = None
@@ -48,6 +54,10 @@ class DependencyGraphCanvas(ttk.Frame):
         self._node_label = node_label
         self._edge_label = edge_label
         self._empty_message = empty_message
+        self._minimum_fit_scale = minimum_fit_scale
+        self._mute_unselected = mute_unselected
+        self._fit_clipped = False
+        self._fit_pending = False
 
         controls = ttk.Frame(self, padding=(0, 0, 0, 7))
         controls.pack(fill="x")
@@ -71,6 +81,12 @@ class DependencyGraphCanvas(ttk.Frame):
             command=self.fit,
             bootstyle="primary-outline",
         ).pack(side="left")
+        ttk.Button(
+            controls,
+            text="Reset",
+            command=self.fit,
+            bootstyle="secondary-outline",
+        ).pack(side="left", padx=(5, 0))
         self.zoom_variable = ttk.StringVar(value="100%")
         ttk.Label(controls, textvariable=self.zoom_variable).pack(
             side="left", padx=(10, 0)
@@ -87,6 +103,7 @@ class DependencyGraphCanvas(ttk.Frame):
         )
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<ButtonPress-1>", self._pointer_down)
+        self.canvas.bind("<Configure>", self._canvas_configured)
         self.canvas.bind("<Double-Button-1>", self._pointer_activate)
         self.canvas.bind("<B1-Motion>", self._pointer_drag)
         self.canvas.bind("<ButtonRelease-1>", self._pointer_up)
@@ -108,6 +125,7 @@ class DependencyGraphCanvas(ttk.Frame):
         self._layout = layout
         self._nodes = {item.node.node_id: item for item in layout.nodes}
         self._selected_id = None
+        self._fit_pending = True
         self._update_status()
         self.after_idle(self.fit)
 
@@ -119,6 +137,8 @@ class DependencyGraphCanvas(ttk.Frame):
         self._scale = 1.0
         self._offset_x = 0.0
         self._offset_y = 0.0
+        self._fit_clipped = False
+        self._fit_pending = False
         self._draw()
         self._update_status()
 
@@ -128,19 +148,25 @@ class DependencyGraphCanvas(ttk.Frame):
         if layout is None or not layout.nodes:
             self._draw()
             return
-        canvas_width = max(self.canvas.winfo_width(), 200)
-        canvas_height = max(self.canvas.winfo_height(), 160)
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        if canvas_width <= 1 or canvas_height <= 1:
+            return
+        self._fit_pending = False
         padding = 24.0
-        self._scale = max(
-            0.2,
-            min(
-                1.6,
-                (canvas_width - 2 * padding) / layout.width,
-                (canvas_height - 2 * padding) / layout.height,
-            ),
+        calculated_scale = min(
+            1.6,
+            (canvas_width - 2 * padding) / layout.width,
+            (canvas_height - 2 * padding) / layout.height,
         )
+        self._scale = max(self._minimum_fit_scale, calculated_scale)
+        self._fit_clipped = calculated_scale < self._minimum_fit_scale
         self._offset_x = (canvas_width - layout.width * self._scale) / 2
-        self._offset_y = (canvas_height - layout.height * self._scale) / 2
+        self._offset_y = (
+            padding
+            if self._fit_clipped
+            else (canvas_height - layout.height * self._scale) / 2
+        )
         self._draw()
 
     def select_node(self, node_id: str, *, center: bool = False) -> bool:
@@ -181,6 +207,8 @@ class DependencyGraphCanvas(ttk.Frame):
                 f"{len(layout.nodes)} {self._node_label} · "
                 f"{len(layout.edges)} {self._edge_label}"
             )
+            if self._fit_clipped:
+                message += " · readable Fit; pan to continue"
         self.graph_status_variable.set(message)
         self.zoom_variable.set(f"{self._scale:.0%}")
 
@@ -217,7 +245,10 @@ class DependencyGraphCanvas(ttk.Frame):
         return source_x + delta_x * factor, source_y + delta_y * factor
 
     def _edge_points(
-        self, source: PositionedNode, target: PositionedNode
+        self,
+        source: PositionedNode,
+        target: PositionedNode,
+        label: str = "",
     ) -> tuple[float, ...]:
         if source.node.node_id == target.node.node_id:
             right = source.x + source.width
@@ -230,6 +261,24 @@ class DependencyGraphCanvas(ttk.Frame):
                 (right + loop_width, top - loop_height),
                 (right - 12.0, top - loop_height),
                 (right - 12.0, top),
+            )
+        elif label in {"loop", "continue"} and target.y < source.y:
+            gutter_x = min(source.x, target.x) - 55.0
+            points = (
+                (source.x, source.y + source.height / 2),
+                (gutter_x, source.y + source.height / 2),
+                (gutter_x, target.y + target.height / 2),
+                (target.x, target.y + target.height / 2),
+            )
+        elif label in {"false", "done", "except", "finally", "break"}:
+            source_right = source.x + source.width
+            target_right = target.x + target.width
+            gutter_x = max(source_right, target_right) + 55.0
+            points = (
+                (source_right, source.y + source.height / 2),
+                (gutter_x, source.y + source.height / 2),
+                (gutter_x, target.y + target.height / 2),
+                (target_right, target.y + target.height / 2),
             )
         else:
             points = (
@@ -269,14 +318,15 @@ class DependencyGraphCanvas(ttk.Frame):
             return
 
         highlighted_nodes, highlighted_edges = self._highlight_sets()
-        has_selection = self._selected_id is not None
+        has_selection = self._selected_id is not None and self._mute_unselected
         for edge in layout.edges:
             source = self._nodes[edge.source_id]
             target = self._nodes[edge.target_id]
             edge_key = (edge.source_id, edge.target_id)
             highlighted = edge_key in highlighted_edges
+            edge_points = self._edge_points(source, target, edge.label)
             self.canvas.create_line(
-                *self._edge_points(source, target),
+                *edge_points,
                 fill=(
                     _HIGHLIGHT_EDGE
                     if highlighted
@@ -287,22 +337,85 @@ class DependencyGraphCanvas(ttk.Frame):
                 width=2.4 if highlighted else 1.4,
                 arrow="last",
                 arrowshape=(9, 11, 4),
-                smooth=source.node.node_id == target.node.node_id,
+                smooth=(
+                    source.node.node_id == target.node.node_id or len(edge_points) > 4
+                ),
             )
+            if edge.label and self._scale >= 0.4:
+                if len(edge_points) > 4:
+                    label_x = edge_points[2]
+                    label_y = (edge_points[3] + edge_points[-1]) / 2
+                else:
+                    label_x = (edge_points[0] + edge_points[-2]) / 2
+                    label_y = (edge_points[1] + edge_points[-1]) / 2
+                self.canvas.create_text(
+                    label_x,
+                    label_y - 7,
+                    text=edge.label,
+                    fill=(
+                        _HIGHLIGHT_EDGE
+                        if highlighted
+                        else _MUTED
+                        if has_selection
+                        else "#607080"
+                    ),
+                    font=("TkDefaultFont", max(7, round(8 * self._scale))),
+                )
 
-        font_size = max(3, min(13, round(10 * self._scale)))
+        minimum_font = 8 if self._minimum_fit_scale >= 0.6 else 3
+        font_size = max(minimum_font, min(13, round(10 * self._scale)))
         for positioned in layout.nodes:
             node_id = positioned.node.node_id
             selected = node_id == self._selected_id
             neighbor = node_id in highlighted_nodes
             muted = has_selection and not neighbor
             box = self._screen_box(positioned)
-            rectangle = self.canvas.create_rectangle(
-                *box,
-                fill=_SELECTED if selected else _NEIGHBOR if neighbor else _NODE_FILL,
-                outline=_MUTED if muted else _SELECTED if selected else _NODE_OUTLINE,
-                width=2.5 if selected else 1.2,
+            fill = (
+                _SELECTED
+                if selected
+                else _NEIGHBOR
+                if neighbor
+                else _TERMINAL_FILL
+                if positioned.node.kind in {"entry", "exit", "return"}
+                else _BRANCH_FILL
+                if positioned.node.kind in {"if", "loop", "try", "except"}
+                else _CYCLE_FILL
+                if positioned.node.cyclic
+                else _NODE_FILL
             )
+            outline = (
+                _MUTED
+                if muted
+                else _SELECTED
+                if selected
+                else _CYCLE
+                if positioned.node.cyclic
+                else _NODE_OUTLINE
+            )
+            if positioned.node.kind in {"entry", "exit"}:
+                shape = self.canvas.create_oval(
+                    *box, fill=fill, outline=outline, width=2.5 if selected else 1.2
+                )
+            elif positioned.node.kind in {"if", "loop"}:
+                center_x = (box[0] + box[2]) / 2
+                center_y = (box[1] + box[3]) / 2
+                shape = self.canvas.create_polygon(
+                    center_x,
+                    box[1],
+                    box[2],
+                    center_y,
+                    center_x,
+                    box[3],
+                    box[0],
+                    center_y,
+                    fill=fill,
+                    outline=outline,
+                    width=2.5 if selected else 1.2,
+                )
+            else:
+                shape = self.canvas.create_rectangle(
+                    *box, fill=fill, outline=outline, width=2.5 if selected else 1.2
+                )
             center_x = (box[0] + box[2]) / 2
             center_y = (box[1] + box[3]) / 2
             text = self.canvas.create_text(
@@ -312,13 +425,17 @@ class DependencyGraphCanvas(ttk.Frame):
                 fill="#ffffff" if selected else _MUTED if muted else _TEXT,
                 font=("TkDefaultFont", font_size, "bold" if selected else "normal"),
             )
-            self._node_items[rectangle] = node_id
+            self._node_items[shape] = node_id
             self._node_items[text] = node_id
         self._update_status()
 
     def _current_node_id(self) -> str | None:
         current = self.canvas.find_withtag("current")
         return self._node_items.get(current[0]) if current else None
+
+    def _canvas_configured(self, _event: tk.Event[tk.Misc]) -> None:
+        if self._fit_pending and self.canvas.winfo_width() > 1:
+            self.after_idle(self.fit)
 
     def _pointer_down(self, event: tk.Event[tk.Misc]) -> None:
         self.canvas.focus_set()

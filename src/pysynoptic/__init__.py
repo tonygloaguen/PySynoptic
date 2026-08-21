@@ -1,6 +1,11 @@
 """PySynoptic public package interface."""
 
-from pysynoptic.analyzer import analyze_project, analyze_python_file
+from pysynoptic.analyzer import (
+    analyze_callable_flow,
+    analyze_project,
+    analyze_python_file,
+    analyze_python_file_context,
+)
 from pysynoptic.models import (
     CallableIdentity,
     CallableSymbol,
@@ -15,7 +20,12 @@ from pysynoptic.models import (
     NameBinding,
     ProjectAnalysis,
 )
-from pysynoptic.renderers import render_mermaid, write_mermaid
+from pysynoptic.renderers import (
+    render_graph_mermaid,
+    render_mermaid,
+    render_mermaid_export,
+    write_mermaid,
+)
 
 __all__ = [
     "CallableIdentity",
@@ -31,8 +41,12 @@ __all__ = [
     "NameBinding",
     "ProjectAnalysis",
     "analyze_project",
+    "analyze_callable_flow",
     "analyze_python_file",
+    "analyze_python_file_context",
     "render_mermaid",
+    "render_graph_mermaid",
+    "render_mermaid_export",
     "write_mermaid",
 ]
-__version__ = "0.0.10"
+__version__ = "0.0.11"

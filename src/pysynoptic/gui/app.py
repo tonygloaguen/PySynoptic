@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -11,15 +12,16 @@ import ttkbootstrap as ttk
 
 from pysynoptic.graph import layout_dependency_graph
 from pysynoptic.gui.analysis_runner import AnalysisRunner
+from pysynoptic.gui.architecture import ArchitecturePanel
 from pysynoptic.gui.call_graph import ContextualCallGraphPanel
 from pysynoptic.gui.controller import ApplicationController
-from pysynoptic.gui.graph_canvas import DependencyGraphCanvas
+from pysynoptic.gui.flow import FlowPanel
 from pysynoptic.gui.state import (
     ApplicationState,
     controls_for_state,
     mark_analysis_started,
 )
-from pysynoptic.models import ProjectAnalysis
+from pysynoptic.renderers import render_mermaid_export
 
 
 class PySynopticApp(ttk.Window):
@@ -29,10 +31,10 @@ class PySynopticApp(ttk.Window):
         super().__init__(themename="flatly")
         self.controller = controller or ApplicationController()
         self.state = ApplicationState()
-        self._graph_analysis: ProjectAnalysis | None = None
         self._tree_graph_nodes: dict[str, str] = {}
         self._analysis_runner = AnalysisRunner(self.controller.analyze)
         self._analysis_poll_id: str | None = None
+        self._active_mermaid_mode = "architecture"
 
         self.title("PySynoptic")
         self.geometry("1180x760")
@@ -69,13 +71,45 @@ class PySynopticApp(ttk.Window):
             bootstyle="primary",
         )
         self.analyze_button.pack(side="left", padx=(8, 8))
-        self.export_button = ttk.Button(
+        self.explore_calls_button = ttk.Button(
             toolbar,
-            text="Export Mermaid",
-            command=self.export_mermaid,
+            text="Explore Calls",
+            command=lambda: self.notebook.select(self.call_graph_panel),
+            bootstyle="secondary-outline",
+        )
+        self.explore_calls_button.pack(side="left", padx=(0, 6))
+        self.explore_flow_button = ttk.Button(
+            toolbar,
+            text="Explore Flow",
+            command=lambda: self.notebook.select(self.flow_panel),
+            bootstyle="secondary-outline",
+        )
+        self.explore_flow_button.pack(side="left")
+        self.export_button = ttk.Menubutton(
+            toolbar,
+            text="Export Mermaid ▾",
             bootstyle="success",
         )
         self.export_button.pack(side="right")
+        export_menu = tk.Menu(self.export_button, tearoff=False)
+        export_menu.add_command(
+            label="Current architecture view",
+            command=lambda: self.export_mermaid("architecture"),
+        )
+        export_menu.add_command(
+            label="Current call graph",
+            command=lambda: self.export_mermaid("calls"),
+        )
+        export_menu.add_command(
+            label="Current function flow",
+            command=lambda: self.export_mermaid("flow"),
+        )
+        export_menu.add_separator()
+        export_menu.add_command(
+            label="Whole project architecture",
+            command=lambda: self.export_mermaid("whole"),
+        )
+        self.export_button.configure(menu=export_menu)
 
     def _build_workspace(self) -> None:
         workspace = ttk.Panedwindow(self, orient="horizontal")
@@ -105,20 +139,28 @@ class PySynopticApp(ttk.Window):
         self.notebook = ttk.Notebook(detail_panel)
         self.notebook.pack(fill="both", expand=True)
         self.overview_text = self._add_text_tab("Overview")
-        self._add_graph_tab()
+        self._add_architecture_tab()
         self._add_call_graph_tab()
+        self._add_flow_tab()
         self.dependencies_text = self._add_text_tab("Dependencies")
         self.mermaid_text = self._add_text_tab("Mermaid", fixed_width=True)
+        self.notebook.bind("<<NotebookTabChanged>>", self._notebook_changed)
 
-    def _add_graph_tab(self) -> None:
-        self.graph_panel = ttk.Frame(self.notebook, padding=8)
-        self.graph_canvas = DependencyGraphCanvas(self.graph_panel)
-        self.graph_canvas.pack(fill="both", expand=True)
-        self.notebook.add(self.graph_panel, text="Graph")
+    def _add_architecture_tab(self) -> None:
+        self.architecture_panel = ArchitecturePanel(self.notebook)
+        self.graph_panel = self.architecture_panel
+        self.graph_canvas = self.architecture_panel.canvas
+        self.notebook.add(self.architecture_panel, text="Architecture")
 
     def _add_call_graph_tab(self) -> None:
-        self.call_graph_panel = ContextualCallGraphPanel(self.notebook)
-        self.notebook.add(self.call_graph_panel, text="Call Graph")
+        self.call_graph_panel = ContextualCallGraphPanel(
+            self.notebook, on_open_flow=self._open_flow
+        )
+        self.notebook.add(self.call_graph_panel, text="Calls")
+
+    def _add_flow_tab(self) -> None:
+        self.flow_panel = FlowPanel(self.notebook)
+        self.notebook.add(self.flow_panel, text="Flow")
 
     def _add_text_tab(self, label: str, *, fixed_width: bool = False) -> ScrolledText:
         panel = ttk.Frame(self.notebook, padding=8)
@@ -204,8 +246,16 @@ class PySynopticApp(ttk.Window):
         self._analysis_runner.shutdown()
         self.destroy()
 
-    def export_mermaid(self) -> None:
-        """Prompt for a destination and export the current project graph."""
+    def export_mermaid(self, mode: str = "architecture") -> None:
+        """Export one explicit current-view or whole-project Mermaid graph."""
+        source = self._mermaid_for_mode(mode)
+        if source is None:
+            messagebox.showinfo(
+                "PySynoptic",
+                "Select and display that graph before exporting it.",
+                parent=self,
+            )
+            return
         output = filedialog.asksaveasfilename(
             parent=self,
             title="Export Mermaid graph",
@@ -215,8 +265,10 @@ class PySynopticApp(ttk.Window):
         if not output:
             return
         try:
-            output_path = self.controller.export_mermaid(self.state, Path(output))
-        except (OSError, ValueError) as error:
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(source, encoding="utf-8")
+        except OSError as error:
             messagebox.showerror("PySynoptic", str(error), parent=self)
             self.status_variable.set(f"Export failed: {error}")
             return
@@ -248,9 +300,13 @@ class PySynopticApp(ttk.Window):
         self.export_button.configure(
             state="normal" if controls.can_export else "disabled"
         )
+        explore_state = "normal" if self.state.project_analysis else "disabled"
+        self.explore_calls_button.configure(state=explore_state)
+        self.explore_flow_button.configure(state=explore_state)
         self._render_tree()
-        self._render_graph()
+        self.architecture_panel.set_analysis(self.state.project_analysis)
         self.call_graph_panel.set_analysis(self.state.project_analysis)
+        self.flow_panel.set_analysis(self.state.project_analysis)
         self._set_text(self.overview_text, self._overview_content())
         self._set_text(self.dependencies_text, self._dependencies_content())
         self._set_text(
@@ -274,7 +330,12 @@ class PySynopticApp(ttk.Window):
             return
 
         if self.state.target_kind == "file":
-            self.project_tree.insert("", "end", text=selected_path.name)
+            item = self.project_tree.insert("", "end", text=selected_path.name)
+            analysis = self.state.project_analysis
+            if analysis and analysis.module_identities:
+                self._tree_graph_nodes[item] = analysis.module_identities[
+                    0
+                ].path.as_posix()
             return
 
         root_id = self.project_tree.insert(
@@ -313,18 +374,6 @@ class PySynopticApp(ttk.Window):
             if node_id is not None:
                 self._tree_graph_nodes[tree_items[parent_key]] = node_id
 
-    def _render_graph(self) -> None:
-        analysis = self.state.project_analysis
-        if analysis is None:
-            if self._graph_analysis is not None:
-                self.graph_canvas.clear()
-                self._graph_analysis = None
-            return
-        if analysis is self._graph_analysis:
-            return
-        self.graph_canvas.set_layout(layout_dependency_graph(analysis))
-        self._graph_analysis = analysis
-
     def _navigate_tree_to_graph(self, _event: object) -> None:
         selected = self.project_tree.selection()
         if not selected:
@@ -332,12 +381,50 @@ class PySynopticApp(ttk.Window):
         node_id = self._tree_graph_nodes.get(selected[0])
         if node_id is None:
             return
-        if self.graph_canvas.select_node(node_id, center=True):
-            self.notebook.select(self.graph_panel)
+        if self.architecture_panel.select_root(node_id):
+            self.notebook.select(self.architecture_panel)
+
+    def _open_flow(self, symbol_id: str) -> None:
+        if self.flow_panel.select_callable(symbol_id):
+            self.notebook.select(self.flow_panel)
+
+    def _mermaid_for_mode(self, mode: str) -> str | None:
+        analysis = self.state.project_analysis
+        if analysis is None:
+            return None
+        if mode == "whole":
+            return render_mermaid_export("whole", analysis)
+        if mode == "architecture":
+            graph = self.architecture_panel.current_graph()
+        elif mode == "calls":
+            graph = self.call_graph_panel.current_graph()
+        elif mode == "flow":
+            graph = self.flow_panel.current_graph()
+        else:
+            raise ValueError(f"Unsupported Mermaid export mode: {mode}")
+        return (
+            render_mermaid_export(mode, analysis, graph) if graph is not None else None
+        )
+
+    def _notebook_changed(self, _event: object) -> None:
+        tab_name = self.notebook.tab(self.notebook.select(), "text")
+        modes = {"Architecture": "architecture", "Calls": "calls", "Flow": "flow"}
+        if tab_name in modes:
+            self._active_mermaid_mode = modes[tab_name]
+            return
+        if tab_name == "Mermaid" and self.state.project_analysis is not None:
+            source = self._mermaid_for_mode(self._active_mermaid_mode)
+            self._set_text(
+                self.mermaid_text,
+                source or "Select a focused Architecture, Calls, or Flow graph first.",
+            )
 
     def _overview_content(self) -> str:
         if self.state.file_analysis is not None:
             analysis = self.state.file_analysis
+            method_count = sum(
+                symbol.kind == "method" for symbol in analysis.callable_symbols
+            )
             lines = [
                 "Python file",
                 "",
@@ -346,7 +433,29 @@ class PySynopticApp(ttk.Window):
                 f"Functions: {len(analysis.functions)}",
                 f"Classes: {len(analysis.classes)}",
                 f"Imports: {len(analysis.import_references)}",
+                f"Methods: {method_count}",
+                f"Call references: {len(analysis.call_references)}",
             ]
+            project = self.state.project_analysis
+            if project:
+                statuses = {
+                    status: sum(
+                        resolution.status == status
+                        for resolution in project.call_resolutions
+                    )
+                    for status in ("resolved", "ambiguous", "unresolved", "dynamic")
+                }
+                lines.extend(
+                    (
+                        f"Resolved calls: {statuses['resolved']}",
+                        f"Ambiguous calls: {statuses['ambiguous']}",
+                        f"Unresolved calls: {statuses['unresolved']}",
+                        f"Dynamic calls: {statuses['dynamic']}",
+                        "",
+                        "Use Calls for caller/callee context and Flow for "
+                        "intra-function structure.",
+                    )
+                )
             if analysis.syntax_error:
                 lines.append(f"Syntax error: {analysis.syntax_error}")
             return "\n".join(lines)
@@ -358,6 +467,7 @@ class PySynopticApp(ttk.Window):
             syntax_error_count = sum(
                 item.syntax_error is not None for item in analysis.file_analyses
             )
+            cycle_count = layout_dependency_graph(analysis).cyclic_component_count
             return "\n".join(
                 (
                     "Project overview",
@@ -370,6 +480,9 @@ class PySynopticApp(ttk.Window):
                     f"Functions: {function_count}",
                     f"Classes: {class_count}",
                     f"Dependencies: {len(analysis.dependencies)}",
+                    f"Callable symbols: {len(analysis.callable_identities)}",
+                    f"Resolved call dependencies: {len(analysis.call_dependencies)}",
+                    f"Dependency cycles: {cycle_count}",
                     f"Syntax errors: {syntax_error_count}",
                     f"Analysis errors: {len(analysis.errors)}",
                 )

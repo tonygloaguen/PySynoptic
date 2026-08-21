@@ -5,24 +5,30 @@ flowchart LR
     module_pysynoptic_analyzer["pysynoptic.analyzer"]
     module_pysynoptic_analyzer_call_resolution["pysynoptic.analyzer.call_resolution"]
     module_pysynoptic_analyzer_callables["pysynoptic.analyzer.callables"]
+    module_pysynoptic_analyzer_flow["pysynoptic.analyzer.flow"]
     module_pysynoptic_analyzer_import_resolution["pysynoptic.analyzer.import_resolution"]
     module_pysynoptic_analyzer_module_identity["pysynoptic.analyzer.module_identity"]
     module_pysynoptic_analyzer_project["pysynoptic.analyzer.project"]
     module_pysynoptic_analyzer_python_file["pysynoptic.analyzer.python_file"]
     module_pysynoptic_cli["pysynoptic.cli"]
     module_pysynoptic_graph["pysynoptic.graph"]
+    module_pysynoptic_graph_architecture["pysynoptic.graph.architecture"]
     module_pysynoptic_graph_calls["pysynoptic.graph.calls"]
     module_pysynoptic_graph_layout["pysynoptic.graph.layout"]
     module_pysynoptic_gui["pysynoptic.gui"]
     module_pysynoptic_gui___main["pysynoptic.gui.__main__"]
     module_pysynoptic_gui_analysis_runner["pysynoptic.gui.analysis_runner"]
     module_pysynoptic_gui_app["pysynoptic.gui.app"]
+    module_pysynoptic_gui_architecture["pysynoptic.gui.architecture"]
     module_pysynoptic_gui_call_graph["pysynoptic.gui.call_graph"]
     module_pysynoptic_gui_controller["pysynoptic.gui.controller"]
+    module_pysynoptic_gui_flow["pysynoptic.gui.flow"]
     module_pysynoptic_gui_graph_canvas["pysynoptic.gui.graph_canvas"]
+    module_pysynoptic_gui_graph_helpers["pysynoptic.gui.graph_helpers"]
     module_pysynoptic_gui_state["pysynoptic.gui.state"]
     module_pysynoptic_models["pysynoptic.models"]
     module_pysynoptic_models_analysis["pysynoptic.models.analysis"]
+    module_pysynoptic_models_flow["pysynoptic.models.flow"]
     module_pysynoptic_models_imports["pysynoptic.models.imports"]
     module_pysynoptic_models_project["pysynoptic.models.project"]
     module_pysynoptic_models_symbols["pysynoptic.models.symbols"]
@@ -35,12 +41,15 @@ flowchart LR
   subgraph package_tests["tests"]
     module_tests["tests"]
     module_tests_test_analysis_runner["tests.test_analysis_runner"]
+    module_tests_test_architecture_graph["tests.test_architecture_graph"]
     module_tests_test_call_resolution["tests.test_call_resolution"]
     module_tests_test_callable_analysis["tests.test_callable_analysis"]
     module_tests_test_cli["tests.test_cli"]
     module_tests_test_contextual_call_graph["tests.test_contextual_call_graph"]
+    module_tests_test_function_flow["tests.test_function_flow"]
     module_tests_test_graph_layout["tests.test_graph_layout"]
     module_tests_test_gui_controller["tests.test_gui_controller"]
+    module_tests_test_gui_graph_helpers["tests.test_gui_graph_helpers"]
     module_tests_test_import_metadata["tests.test_import_metadata"]
     module_tests_test_import_resolution["tests.test_import_resolution"]
     module_tests_test_mermaid_renderer["tests.test_mermaid_renderer"]
@@ -50,109 +59,143 @@ flowchart LR
     module_tests_test_project_analysis["tests.test_project_analysis"]
     module_tests_test_python_file["tests.test_python_file"]
   end
-  module_pysynoptic --> module_pysynoptic_analyzer_project
-  module_pysynoptic --> module_pysynoptic_analyzer_python_file
-  module_pysynoptic --> module_pysynoptic_models_analysis
-  module_pysynoptic --> module_pysynoptic_models_imports
-  module_pysynoptic --> module_pysynoptic_models_project
-  module_pysynoptic --> module_pysynoptic_models_symbols
-  module_pysynoptic --> module_pysynoptic_renderers_mermaid
-  module_pysynoptic___main --> module_pysynoptic_cli
-  module_pysynoptic_analyzer --> module_pysynoptic_analyzer_project
-  module_pysynoptic_analyzer --> module_pysynoptic_analyzer_python_file
-  module_pysynoptic_analyzer_call_resolution --> module_pysynoptic_models_analysis
-  module_pysynoptic_analyzer_call_resolution --> module_pysynoptic_models_imports
-  module_pysynoptic_analyzer_call_resolution --> module_pysynoptic_models_project
-  module_pysynoptic_analyzer_call_resolution --> module_pysynoptic_models_symbols
-  module_pysynoptic_analyzer_callables --> module_pysynoptic_models_symbols
-  module_pysynoptic_analyzer_import_resolution --> module_pysynoptic_models_analysis
-  module_pysynoptic_analyzer_import_resolution --> module_pysynoptic_models_imports
-  module_pysynoptic_analyzer_import_resolution --> module_pysynoptic_models_project
-  module_pysynoptic_analyzer_module_identity --> module_pysynoptic_models_project
-  module_pysynoptic_analyzer_project --> module_pysynoptic_analyzer_call_resolution
-  module_pysynoptic_analyzer_project --> module_pysynoptic_analyzer_import_resolution
-  module_pysynoptic_analyzer_project --> module_pysynoptic_analyzer_module_identity
-  module_pysynoptic_analyzer_project --> module_pysynoptic_analyzer_python_file
-  module_pysynoptic_analyzer_project --> module_pysynoptic_models_project
-  module_pysynoptic_analyzer_project --> module_pysynoptic_scanner_project_scanner
-  module_pysynoptic_analyzer_python_file --> module_pysynoptic_analyzer_callables
-  module_pysynoptic_analyzer_python_file --> module_pysynoptic_models_analysis
-  module_pysynoptic_analyzer_python_file --> module_pysynoptic_models_imports
-  module_pysynoptic_cli --> module_pysynoptic_analyzer_project
-  module_pysynoptic_cli --> module_pysynoptic_analyzer_python_file
-  module_pysynoptic_cli --> module_pysynoptic_models_analysis
-  module_pysynoptic_cli --> module_pysynoptic_models_project
-  module_pysynoptic_cli --> module_pysynoptic_renderers_mermaid
-  module_pysynoptic_graph --> module_pysynoptic_graph_calls
-  module_pysynoptic_graph --> module_pysynoptic_graph_layout
-  module_pysynoptic_graph_calls --> module_pysynoptic_graph_layout
-  module_pysynoptic_graph_calls --> module_pysynoptic_models_project
-  module_pysynoptic_graph_layout --> module_pysynoptic_models_project
-  module_pysynoptic_gui --> module_pysynoptic_gui_app
-  module_pysynoptic_gui___main --> module_pysynoptic_gui
-  module_pysynoptic_gui_analysis_runner --> module_pysynoptic_gui_state
-  module_pysynoptic_gui_app --> module_pysynoptic_graph_layout
-  module_pysynoptic_gui_app --> module_pysynoptic_gui_analysis_runner
-  module_pysynoptic_gui_app --> module_pysynoptic_gui_call_graph
-  module_pysynoptic_gui_app --> module_pysynoptic_gui_controller
-  module_pysynoptic_gui_app --> module_pysynoptic_gui_graph_canvas
-  module_pysynoptic_gui_app --> module_pysynoptic_gui_state
-  module_pysynoptic_gui_app --> module_pysynoptic_models_project
-  module_pysynoptic_gui_call_graph --> module_pysynoptic_graph_calls
-  module_pysynoptic_gui_call_graph --> module_pysynoptic_graph_layout
-  module_pysynoptic_gui_call_graph --> module_pysynoptic_gui_graph_canvas
-  module_pysynoptic_gui_call_graph --> module_pysynoptic_models_project
-  module_pysynoptic_gui_controller --> module_pysynoptic_analyzer_project
-  module_pysynoptic_gui_controller --> module_pysynoptic_analyzer_python_file
-  module_pysynoptic_gui_controller --> module_pysynoptic_gui_state
-  module_pysynoptic_gui_controller --> module_pysynoptic_renderers_mermaid
-  module_pysynoptic_gui_graph_canvas --> module_pysynoptic_graph_layout
-  module_pysynoptic_gui_state --> module_pysynoptic_models_analysis
-  module_pysynoptic_gui_state --> module_pysynoptic_models_project
-  module_pysynoptic_models --> module_pysynoptic_models_analysis
-  module_pysynoptic_models --> module_pysynoptic_models_imports
-  module_pysynoptic_models --> module_pysynoptic_models_project
-  module_pysynoptic_models --> module_pysynoptic_models_symbols
-  module_pysynoptic_models_analysis --> module_pysynoptic_models_imports
-  module_pysynoptic_models_analysis --> module_pysynoptic_models_symbols
-  module_pysynoptic_models_project --> module_pysynoptic_models_analysis
-  module_pysynoptic_models_project --> module_pysynoptic_models_imports
-  module_pysynoptic_models_project --> module_pysynoptic_models_symbols
-  module_pysynoptic_renderers --> module_pysynoptic_renderers_mermaid
-  module_pysynoptic_renderers_mermaid --> module_pysynoptic_models_project
-  module_pysynoptic_scanner --> module_pysynoptic_scanner_exclusions
-  module_pysynoptic_scanner --> module_pysynoptic_scanner_project_scanner
-  module_pysynoptic_scanner_project_scanner --> module_pysynoptic_models_project
-  module_pysynoptic_scanner_project_scanner --> module_pysynoptic_scanner_exclusions
-  module_tests_test_analysis_runner --> module_pysynoptic_gui_analysis_runner
-  module_tests_test_analysis_runner --> module_pysynoptic_gui_controller
-  module_tests_test_analysis_runner --> module_pysynoptic_gui_state
-  module_tests_test_call_resolution --> module_pysynoptic_analyzer_project
-  module_tests_test_callable_analysis --> module_pysynoptic_analyzer_python_file
-  module_tests_test_cli --> module_pysynoptic_cli
-  module_tests_test_contextual_call_graph --> module_pysynoptic_analyzer_project
-  module_tests_test_contextual_call_graph --> module_pysynoptic_graph_calls
-  module_tests_test_contextual_call_graph --> module_pysynoptic_graph_layout
-  module_tests_test_graph_layout --> module_pysynoptic_analyzer_project
-  module_tests_test_graph_layout --> module_pysynoptic_graph_layout
-  module_tests_test_gui_controller --> module_pysynoptic_gui_controller
-  module_tests_test_gui_controller --> module_pysynoptic_gui_state
-  module_tests_test_import_metadata --> module_pysynoptic_analyzer_python_file
-  module_tests_test_import_metadata --> module_pysynoptic_models_imports
-  module_tests_test_import_resolution --> module_pysynoptic_analyzer_project
-  module_tests_test_import_resolution --> module_pysynoptic_models_project
-  module_tests_test_mermaid_renderer --> module_pysynoptic_analyzer_project
-  module_tests_test_mermaid_renderer --> module_pysynoptic_models_project
-  module_tests_test_mermaid_renderer --> module_pysynoptic_renderers_mermaid
-  module_tests_test_module_identity --> module_pysynoptic_analyzer_project
-  module_tests_test_module_identity --> module_pysynoptic_analyzer_python_file
-  module_tests_test_module_identity --> module_pysynoptic_models_project
-  module_tests_test_module_identity --> module_pysynoptic_scanner_project_scanner
-  module_tests_test_nested_imports --> module_pysynoptic_analyzer_project
-  module_tests_test_nested_imports --> module_pysynoptic_analyzer_python_file
-  module_tests_test_packaging --> module_pysynoptic
-  module_tests_test_project_analysis --> module_pysynoptic_analyzer_project
-  module_tests_test_project_analysis --> module_pysynoptic_models_analysis
-  module_tests_test_project_analysis --> module_pysynoptic_scanner_exclusions
-  module_tests_test_project_analysis --> module_pysynoptic_scanner_project_scanner
-  module_tests_test_python_file --> module_pysynoptic_analyzer_python_file
+  module_pysynoptic -->|imports| module_pysynoptic_analyzer_flow
+  module_pysynoptic -->|imports| module_pysynoptic_analyzer_project
+  module_pysynoptic -->|imports| module_pysynoptic_analyzer_python_file
+  module_pysynoptic -->|imports| module_pysynoptic_models_analysis
+  module_pysynoptic -->|imports| module_pysynoptic_models_imports
+  module_pysynoptic -->|imports| module_pysynoptic_models_project
+  module_pysynoptic -->|imports| module_pysynoptic_models_symbols
+  module_pysynoptic -->|imports| module_pysynoptic_renderers_mermaid
+  module_pysynoptic___main -->|imports| module_pysynoptic_cli
+  module_pysynoptic_analyzer -->|imports| module_pysynoptic_analyzer_flow
+  module_pysynoptic_analyzer -->|imports| module_pysynoptic_analyzer_project
+  module_pysynoptic_analyzer -->|imports| module_pysynoptic_analyzer_python_file
+  module_pysynoptic_analyzer_call_resolution -->|imports| module_pysynoptic_models_analysis
+  module_pysynoptic_analyzer_call_resolution -->|imports| module_pysynoptic_models_imports
+  module_pysynoptic_analyzer_call_resolution -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_analyzer_call_resolution -->|imports| module_pysynoptic_models_symbols
+  module_pysynoptic_analyzer_callables -->|imports| module_pysynoptic_models_symbols
+  module_pysynoptic_analyzer_flow -->|imports| module_pysynoptic_models_flow
+  module_pysynoptic_analyzer_flow -->|imports| module_pysynoptic_models_symbols
+  module_pysynoptic_analyzer_import_resolution -->|imports| module_pysynoptic_models_analysis
+  module_pysynoptic_analyzer_import_resolution -->|imports| module_pysynoptic_models_imports
+  module_pysynoptic_analyzer_import_resolution -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_analyzer_module_identity -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_analyzer_project -->|imports| module_pysynoptic_analyzer_call_resolution
+  module_pysynoptic_analyzer_project -->|imports| module_pysynoptic_analyzer_import_resolution
+  module_pysynoptic_analyzer_project -->|imports| module_pysynoptic_analyzer_module_identity
+  module_pysynoptic_analyzer_project -->|imports| module_pysynoptic_analyzer_python_file
+  module_pysynoptic_analyzer_project -->|imports| module_pysynoptic_models_analysis
+  module_pysynoptic_analyzer_project -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_analyzer_project -->|imports| module_pysynoptic_scanner_project_scanner
+  module_pysynoptic_analyzer_python_file -->|imports| module_pysynoptic_analyzer_callables
+  module_pysynoptic_analyzer_python_file -->|imports| module_pysynoptic_models_analysis
+  module_pysynoptic_analyzer_python_file -->|imports| module_pysynoptic_models_imports
+  module_pysynoptic_cli -->|imports| module_pysynoptic_analyzer_project
+  module_pysynoptic_cli -->|imports| module_pysynoptic_analyzer_python_file
+  module_pysynoptic_cli -->|imports| module_pysynoptic_models_analysis
+  module_pysynoptic_cli -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_cli -->|imports| module_pysynoptic_renderers_mermaid
+  module_pysynoptic_graph -->|imports| module_pysynoptic_graph_architecture
+  module_pysynoptic_graph -->|imports| module_pysynoptic_graph_calls
+  module_pysynoptic_graph -->|imports| module_pysynoptic_graph_layout
+  module_pysynoptic_graph_architecture -->|imports| module_pysynoptic_graph_layout
+  module_pysynoptic_graph_architecture -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_graph_calls -->|imports| module_pysynoptic_graph_layout
+  module_pysynoptic_graph_calls -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_graph_layout -->|imports| module_pysynoptic_models_flow
+  module_pysynoptic_graph_layout -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_gui -->|imports| module_pysynoptic_gui_app
+  module_pysynoptic_gui___main -->|imports| module_pysynoptic_gui
+  module_pysynoptic_gui_analysis_runner -->|imports| module_pysynoptic_gui_state
+  module_pysynoptic_gui_app -->|imports| module_pysynoptic_graph_layout
+  module_pysynoptic_gui_app -->|imports| module_pysynoptic_gui_analysis_runner
+  module_pysynoptic_gui_app -->|imports| module_pysynoptic_gui_architecture
+  module_pysynoptic_gui_app -->|imports| module_pysynoptic_gui_call_graph
+  module_pysynoptic_gui_app -->|imports| module_pysynoptic_gui_controller
+  module_pysynoptic_gui_app -->|imports| module_pysynoptic_gui_flow
+  module_pysynoptic_gui_app -->|imports| module_pysynoptic_gui_state
+  module_pysynoptic_gui_app -->|imports| module_pysynoptic_renderers_mermaid
+  module_pysynoptic_gui_architecture -->|imports| module_pysynoptic_graph_architecture
+  module_pysynoptic_gui_architecture -->|imports| module_pysynoptic_graph_layout
+  module_pysynoptic_gui_architecture -->|imports| module_pysynoptic_gui_graph_canvas
+  module_pysynoptic_gui_architecture -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_gui_call_graph -->|imports| module_pysynoptic_graph_calls
+  module_pysynoptic_gui_call_graph -->|imports| module_pysynoptic_graph_layout
+  module_pysynoptic_gui_call_graph -->|imports| module_pysynoptic_gui_graph_canvas
+  module_pysynoptic_gui_call_graph -->|imports| module_pysynoptic_gui_graph_helpers
+  module_pysynoptic_gui_call_graph -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_gui_controller -->|imports| module_pysynoptic_analyzer_project
+  module_pysynoptic_gui_controller -->|imports| module_pysynoptic_gui_state
+  module_pysynoptic_gui_controller -->|imports| module_pysynoptic_renderers_mermaid
+  module_pysynoptic_gui_flow -->|imports| module_pysynoptic_analyzer_flow
+  module_pysynoptic_gui_flow -->|imports| module_pysynoptic_graph_layout
+  module_pysynoptic_gui_flow -->|imports| module_pysynoptic_gui_graph_canvas
+  module_pysynoptic_gui_flow -->|imports| module_pysynoptic_gui_graph_helpers
+  module_pysynoptic_gui_flow -->|imports| module_pysynoptic_models_flow
+  module_pysynoptic_gui_flow -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_gui_graph_canvas -->|imports| module_pysynoptic_graph_layout
+  module_pysynoptic_gui_graph_helpers -->|imports| module_pysynoptic_graph_calls
+  module_pysynoptic_gui_graph_helpers -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_gui_state -->|imports| module_pysynoptic_models_analysis
+  module_pysynoptic_gui_state -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_models -->|imports| module_pysynoptic_models_analysis
+  module_pysynoptic_models -->|imports| module_pysynoptic_models_flow
+  module_pysynoptic_models -->|imports| module_pysynoptic_models_imports
+  module_pysynoptic_models -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_models -->|imports| module_pysynoptic_models_symbols
+  module_pysynoptic_models_analysis -->|imports| module_pysynoptic_models_imports
+  module_pysynoptic_models_analysis -->|imports| module_pysynoptic_models_symbols
+  module_pysynoptic_models_project -->|imports| module_pysynoptic_models_analysis
+  module_pysynoptic_models_project -->|imports| module_pysynoptic_models_imports
+  module_pysynoptic_models_project -->|imports| module_pysynoptic_models_symbols
+  module_pysynoptic_renderers -->|imports| module_pysynoptic_renderers_mermaid
+  module_pysynoptic_renderers_mermaid -->|imports| module_pysynoptic_graph_layout
+  module_pysynoptic_renderers_mermaid -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_scanner -->|imports| module_pysynoptic_scanner_exclusions
+  module_pysynoptic_scanner -->|imports| module_pysynoptic_scanner_project_scanner
+  module_pysynoptic_scanner_project_scanner -->|imports| module_pysynoptic_models_project
+  module_pysynoptic_scanner_project_scanner -->|imports| module_pysynoptic_scanner_exclusions
+  module_tests_test_analysis_runner -->|imports| module_pysynoptic_gui_analysis_runner
+  module_tests_test_analysis_runner -->|imports| module_pysynoptic_gui_controller
+  module_tests_test_analysis_runner -->|imports| module_pysynoptic_gui_state
+  module_tests_test_architecture_graph -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_architecture_graph -->|imports| module_pysynoptic_graph_architecture
+  module_tests_test_call_resolution -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_callable_analysis -->|imports| module_pysynoptic_analyzer_python_file
+  module_tests_test_cli -->|imports| module_pysynoptic_cli
+  module_tests_test_contextual_call_graph -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_contextual_call_graph -->|imports| module_pysynoptic_graph_calls
+  module_tests_test_contextual_call_graph -->|imports| module_pysynoptic_graph_layout
+  module_tests_test_function_flow -->|imports| module_pysynoptic_analyzer_flow
+  module_tests_test_function_flow -->|imports| module_pysynoptic_analyzer_python_file
+  module_tests_test_function_flow -->|imports| module_pysynoptic_graph_layout
+  module_tests_test_graph_layout -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_graph_layout -->|imports| module_pysynoptic_graph_layout
+  module_tests_test_gui_controller -->|imports| module_pysynoptic_gui_controller
+  module_tests_test_gui_controller -->|imports| module_pysynoptic_gui_state
+  module_tests_test_gui_graph_helpers -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_gui_graph_helpers -->|imports| module_pysynoptic_graph_layout
+  module_tests_test_gui_graph_helpers -->|imports| module_pysynoptic_gui_graph_helpers
+  module_tests_test_gui_graph_helpers -->|imports| module_pysynoptic_renderers_mermaid
+  module_tests_test_import_metadata -->|imports| module_pysynoptic_analyzer_python_file
+  module_tests_test_import_metadata -->|imports| module_pysynoptic_models_imports
+  module_tests_test_import_resolution -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_import_resolution -->|imports| module_pysynoptic_models_project
+  module_tests_test_mermaid_renderer -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_mermaid_renderer -->|imports| module_pysynoptic_graph_layout
+  module_tests_test_mermaid_renderer -->|imports| module_pysynoptic_models_project
+  module_tests_test_mermaid_renderer -->|imports| module_pysynoptic_renderers_mermaid
+  module_tests_test_module_identity -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_module_identity -->|imports| module_pysynoptic_analyzer_python_file
+  module_tests_test_module_identity -->|imports| module_pysynoptic_models_project
+  module_tests_test_module_identity -->|imports| module_pysynoptic_scanner_project_scanner
+  module_tests_test_nested_imports -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_nested_imports -->|imports| module_pysynoptic_analyzer_python_file
+  module_tests_test_packaging -->|imports| module_pysynoptic
+  module_tests_test_project_analysis -->|imports| module_pysynoptic_analyzer_project
+  module_tests_test_project_analysis -->|imports| module_pysynoptic_models_analysis
+  module_tests_test_project_analysis -->|imports| module_pysynoptic_scanner_exclusions
+  module_tests_test_project_analysis -->|imports| module_pysynoptic_scanner_project_scanner
+  module_tests_test_python_file -->|imports| module_pysynoptic_analyzer_python_file

@@ -13,6 +13,11 @@ def resolve_source_roots(project_root: Path) -> tuple[Path, ...]:
     src_root = project_root / "src"
     if src_root.is_dir() and not src_root.is_symlink():
         return (src_root, project_root)
+    if (project_root / "__init__.py").is_file():
+        package_root = project_root
+        while (package_root.parent / "__init__.py").is_file():
+            package_root = package_root.parent
+        return (package_root.parent,)
     return (project_root,)
 
 

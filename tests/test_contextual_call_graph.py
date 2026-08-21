@@ -3,10 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from pysynoptic import analyze_project
+from pysynoptic import analyze_project, analyze_python_file_context
 from pysynoptic.graph import (
     build_contextual_call_graph,
     call_graph_roots,
+    callable_details,
     layout_graph,
     search_call_graph_roots,
 )
@@ -78,9 +79,9 @@ def test_callable_outgoing_depth_one_contains_direct_callee(tmp_path: Path) -> N
     analysis = sample_analysis(tmp_path)
     root = root_by_label(analysis, "flow::first")
 
-    result = build_contextual_call_graph(analysis, root)
+    result = build_contextual_call_graph(analysis, root, direction="outgoing")
 
-    assert labels(result) == {"flow::first", "flow::second"}
+    assert labels(result) == {"first()", "second()"}
     assert result.diagnostics.visible_edge_count == 1
     assert result.diagnostics.outgoing_count == 1
 
@@ -89,11 +90,15 @@ def test_increasing_depth_rebuilds_with_next_hop(tmp_path: Path) -> None:
     analysis = sample_analysis(tmp_path)
     root = root_by_label(analysis, "flow::first")
 
-    depth_one = build_contextual_call_graph(analysis, root, depth=1)
-    depth_two = build_contextual_call_graph(analysis, root, depth=2)
+    depth_one = build_contextual_call_graph(
+        analysis, root, direction="outgoing", depth=1
+    )
+    depth_two = build_contextual_call_graph(
+        analysis, root, direction="outgoing", depth=2
+    )
 
-    assert "flow::third" not in labels(depth_one)
-    assert "flow::third" in labels(depth_two)
+    assert "third()" not in labels(depth_one)
+    assert "third()" in labels(depth_two)
     assert len(depth_two.graph.edges) == 2
 
 
@@ -110,10 +115,10 @@ def test_incoming_context_follows_callers_and_module_level_calls(
     )
 
     assert labels(result) == {
-        "flow::first",
-        "entry::caller",
-        "entry::noisy",
-        "entry::<module>",
+        "first()",
+        "caller()",
+        "noisy()",
+        "<entry module>",
     }
     assert result.diagnostics.incoming_count == 3
 
@@ -139,8 +144,8 @@ def test_both_context_preserves_original_edge_directions(tmp_path: Path) -> None
         for edge in result.graph.edges
     }
 
-    assert ("flow::first", "flow::second") in edge_labels
-    assert ("entry::caller", "flow::first") in edge_labels
+    assert ("first()", "second()") in edge_labels
+    assert ("caller()", "first()") in edge_labels
 
 
 def test_module_root_seeds_module_level_and_all_module_callables(
@@ -149,10 +154,10 @@ def test_module_root_seeds_module_level_and_all_module_callables(
     analysis = sample_analysis(tmp_path)
     root = root_by_label(analysis, "entry")
 
-    result = build_contextual_call_graph(analysis, root)
+    result = build_contextual_call_graph(analysis, root, direction="outgoing")
 
-    assert {"entry::<module>", "entry::caller", "entry::noisy"} <= labels(result)
-    assert "flow::first" in labels(result)
+    assert {"<entry module>", "caller()", "noisy()"} <= labels(result)
+    assert "first()" in labels(result)
     assert len(result.root_node_ids) == 3
 
 
@@ -199,3 +204,52 @@ def test_rejects_root_from_another_analysis(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="does not belong"):
         build_contextual_call_graph(analysis, root)
+
+
+def test_single_file_reuses_conservative_resolution_and_short_labels(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "single.py"
+    write_python(
+        path,
+        (
+            "from os import stat\n"
+            "def helper():\n    pass\n"
+            "def main():\n    helper()\n    stat('x')\n"
+            "class Runner:\n"
+            "    def first(self):\n        self.second()\n"
+            "    def second(self):\n        pass\n"
+        ),
+    )
+    analysis = analyze_python_file_context(path)
+    root = root_by_label(analysis, "single::main")
+
+    result = build_contextual_call_graph(analysis, root, direction="outgoing", depth=1)
+
+    assert labels(result) == {"main()", "helper()"}
+    assert len(analysis.call_dependencies) == 2
+    assert not any(
+        dependency.target.symbol.name == "stat"
+        for dependency in analysis.call_dependencies
+    )
+    method_root = root_by_label(analysis, "single::Runner.first")
+    method_graph = build_contextual_call_graph(
+        analysis, method_root, direction="outgoing"
+    )
+    assert labels(method_graph) == {"Runner.first()", "Runner.second()"}
+
+
+def test_callable_details_keep_identity_out_of_box(tmp_path: Path) -> None:
+    analysis = sample_analysis(tmp_path)
+    root = root_by_label(analysis, "flow::first")
+
+    details = callable_details(analysis, root.root_id)
+    result = build_contextual_call_graph(analysis, root)
+
+    assert details is not None
+    assert details.qualified_name == "flow::first"
+    assert details.path.name == "flow.py"
+    assert details.incoming
+    assert any(label.endswith("::<module>") for _, label in details.incoming)
+    assert details.outgoing
+    assert all("::" not in node.label for node in result.graph.nodes)

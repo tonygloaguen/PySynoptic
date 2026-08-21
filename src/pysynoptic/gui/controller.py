@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from pysynoptic.analyzer import analyze_project, analyze_python_file
+from pysynoptic.analyzer import analyze_project, analyze_python_file_context
 from pysynoptic.gui.state import ApplicationState
 from pysynoptic.renderers import render_mermaid, write_mermaid
 
@@ -52,7 +52,8 @@ class ApplicationController:
 
         try:
             if state.target_kind == "file":
-                analysis = analyze_python_file(state.selected_path)
+                project_analysis = analyze_python_file_context(state.selected_path)
+                analysis = project_analysis.file_analyses[0]
                 has_syntax_error = analysis.syntax_error is not None
                 status = (
                     "File analysis completed with a syntax error."
@@ -62,8 +63,8 @@ class ApplicationController:
                 return replace(
                     state,
                     file_analysis=analysis,
-                    project_analysis=None,
-                    mermaid_source="",
+                    project_analysis=project_analysis,
+                    mermaid_source=render_mermaid(project_analysis),
                     is_analyzing=False,
                     status_message=status,
                     error_message=None,

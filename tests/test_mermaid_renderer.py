@@ -3,8 +3,9 @@ from pathlib import Path
 import pytest
 
 from pysynoptic import analyze_project
+from pysynoptic.graph import DependencyGraph, GraphEdge, GraphNode
 from pysynoptic.models import ModuleIdentity, ProjectAnalysis
-from pysynoptic.renderers import render_mermaid, write_mermaid
+from pysynoptic.renderers import render_graph_mermaid, render_mermaid, write_mermaid
 
 
 def write_python(path: Path, source: str = "") -> Path:
@@ -33,7 +34,7 @@ def test_renders_exact_deterministic_mermaid_text(tmp_path: Path) -> None:
         '    module_package["package"]\n'
         '    module_package_service["package.service"]\n'
         "  end\n"
-        "  module_package --> module_package_service\n"
+        "  module_package -->|imports| module_package_service\n"
     )
 
 
@@ -105,3 +106,23 @@ def test_writes_identical_mermaid_output_repeatedly(tmp_path: Path) -> None:
 def test_rejects_unsupported_direction(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Unsupported Mermaid direction"):
         render_mermaid(ProjectAnalysis(root_path=tmp_path), direction="XX")  # type: ignore[arg-type]
+
+
+def test_renders_current_graph_with_short_nodes_and_labeled_edges(
+    tmp_path: Path,
+) -> None:
+    graph = DependencyGraph(
+        nodes=(
+            GraphNode("long::caller", "caller()", tmp_path / "file.py"),
+            GraphNode("long::callee", "callee()", tmp_path / "file.py"),
+        ),
+        edges=(GraphEdge("long::caller", "long::callee", "calls"),),
+    )
+
+    rendered = render_graph_mermaid(graph)
+
+    assert rendered.startswith("flowchart TD\n")
+    assert '["caller()"]' in rendered
+    assert '["callee()"]' in rendered
+    assert "-->|calls|" in rendered
+    assert "long::" not in rendered

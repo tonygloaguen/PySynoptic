@@ -50,8 +50,36 @@ class ContextualCallGraph:
     diagnostics: CallGraphDiagnostics
 
 
+@dataclass(frozen=True, slots=True)
+class CallableDetails:
+    """Concise graph label plus complete static callable context."""
+
+    node_id: str
+    name: str
+    qualified_name: str
+    kind: str
+    module: str
+    path: Path
+    line: int
+    lexical_parent: str | None
+    incoming: tuple[tuple[str, str], ...]
+    outgoing: tuple[tuple[str, str], ...]
+    resolved_count: int
+    ambiguous_count: int
+    unresolved_count: int
+    dynamic_count: int
+
+
 def _module_node_id(path: Path) -> str:
     return f"module:{path.as_posix()}"
+
+
+def _callable_node_label(qualified_name: str, name: str, kind: str) -> str:
+    if kind == "method":
+        parts = [part for part in qualified_name.split(".") if part != "<locals>"]
+        if len(parts) > 1:
+            return f"{parts[-2]}.{name}()"
+    return f"{name}()"
 
 
 def call_graph_roots(analysis: ProjectAnalysis) -> tuple[CallGraphRoot, ...]:
@@ -103,7 +131,11 @@ def _logical_call_graph(analysis: ProjectAnalysis) -> DependencyGraph:
     callable_nodes = (
         GraphNode(
             node_id=identity.symbol.symbol_id,
-            label=identity.qualified_name,
+            label=_callable_node_label(
+                identity.symbol.qualified_name,
+                identity.symbol.name,
+                identity.symbol.kind,
+            ),
             path=identity.module.path,
         )
         for identity in analysis.callable_identities
@@ -111,7 +143,11 @@ def _logical_call_graph(analysis: ProjectAnalysis) -> DependencyGraph:
     module_nodes = (
         GraphNode(
             node_id=_module_node_id(identity.path),
-            label=f"{identity.dotted_name}::<module>",
+            label=(
+                "<module>"
+                if len(analysis.module_identities) == 1
+                else f"<{identity.dotted_name.rsplit('.', 1)[-1]} module>"
+            ),
             path=identity.path,
         )
         for identity in analysis.module_identities
@@ -131,6 +167,7 @@ def _logical_call_graph(analysis: ProjectAnalysis) -> DependencyGraph:
                 else _module_node_id(dependency.source_module.path)
             ),
             target_id=dependency.target.symbol.symbol_id,
+            label="calls",
         )
         for dependency in analysis.call_dependencies
     }
@@ -229,7 +266,7 @@ def build_contextual_call_graph(
     analysis: ProjectAnalysis,
     root: CallGraphRoot,
     *,
-    direction: CallGraphDirection = "outgoing",
+    direction: CallGraphDirection = "both",
     depth: int = 1,
 ) -> ContextualCallGraph:
     """Build a one-to-three-hop call graph around a module or callable root."""
@@ -273,4 +310,73 @@ def build_contextual_call_graph(
         graph=context,
         root_node_ids=seeds,
         diagnostics=diagnostics,
+    )
+
+
+def callable_details(analysis: ProjectAnalysis, node_id: str) -> CallableDetails | None:
+    """Return full details for one callable graph node."""
+    identity = next(
+        (
+            item
+            for item in analysis.callable_identities
+            if item.symbol.symbol_id == node_id
+        ),
+        None,
+    )
+    if identity is None:
+        return None
+    labels = {
+        item.symbol.symbol_id: item.qualified_name
+        for item in analysis.callable_identities
+    }
+    incoming = tuple(
+        sorted(
+            (
+                (
+                    dependency.source_callable.symbol.symbol_id
+                    if dependency.source_callable is not None
+                    else _module_node_id(dependency.source_module.path)
+                ),
+                (
+                    dependency.source_callable.qualified_name
+                    if dependency.source_callable is not None
+                    else f"{dependency.source_module.dotted_name}::<module>"
+                ),
+            )
+            for dependency in analysis.call_dependencies
+            if dependency.target == identity
+        )
+    )
+    outgoing = tuple(
+        sorted(
+            (
+                dependency.target.symbol.symbol_id,
+                dependency.target.qualified_name,
+            )
+            for dependency in analysis.call_dependencies
+            if dependency.source_callable == identity
+        )
+    )
+    statuses = {
+        status: 0 for status in ("resolved", "ambiguous", "unresolved", "dynamic")
+    }
+    for resolution in analysis.call_resolutions:
+        if resolution.reference.caller_symbol_id == node_id:
+            statuses[resolution.status] += 1
+    parent = labels.get(identity.symbol.parent_symbol_id or "")
+    return CallableDetails(
+        node_id,
+        identity.symbol.name,
+        identity.qualified_name,
+        identity.symbol.kind,
+        identity.module.dotted_name,
+        identity.module.path,
+        identity.symbol.line,
+        parent,
+        incoming,
+        outgoing,
+        statuses["resolved"],
+        statuses["ambiguous"],
+        statuses["unresolved"],
+        statuses["dynamic"],
     )

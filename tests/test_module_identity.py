@@ -136,3 +136,31 @@ def test_single_file_api_keeps_stem_module_name(tmp_path: Path) -> None:
     analysis = analyze_python_file(module_path)
 
     assert analysis.module_name == "module"
+
+
+def test_package_identities_are_consistent_for_three_scan_boundaries(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "src" / "package"
+    write_python(package / "__init__.py")
+    write_python(package / "a.py", "from package.b import run\n")
+    write_python(package / "b.py", "def run():\n    pass\n")
+
+    analyses = (
+        analyze_project(tmp_path),
+        analyze_project(tmp_path / "src"),
+        analyze_project(package),
+    )
+
+    for analysis in analyses:
+        assert tuple(item.dotted_name for item in analysis.module_identities) == (
+            "package",
+            "package.a",
+            "package.b",
+        )
+        assert {
+            (dependency.source.dotted_name, dependency.target.dotted_name)
+            for dependency in analysis.dependencies
+        } == {("package.a", "package.b")}
+    assert analyses[2].root_path == package
+    assert all(path.is_relative_to(package) for path in analyses[2].python_files)

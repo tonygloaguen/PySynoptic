@@ -16,7 +16,7 @@ project.
 
 ## Current capabilities
 
-Version `0.0.10` provides both the established command-line interface and an
+Version `0.0.11` provides both the established command-line interface and an
 interactive desktop interface. It analyzes either one `.py` file or a complete
 directory tree and reports:
 
@@ -30,6 +30,9 @@ directory tree and reports:
 - deterministic callable dependencies derived only from confidently resolved
   calls;
 - contextual, interactive call graphs bounded by root, direction, and depth;
+- focused module architecture graphs with cycle discovery and module details;
+- on-demand, AST-only intra-function flow graphs for branches, loops,
+  exception handling, calls, and terminating statements;
 - structured `import x` and `from x import y` metadata from every lexical
   scope, including aliases, relative levels, and source positions;
 - syntax errors with their source location;
@@ -43,10 +46,11 @@ directory tree and reports:
 
 The desktop application lets the user select a Python file or project, start
 the same static analysis used by the CLI, browse the discovered project tree,
-navigate native interactive module and contextual call graphs, inspect a
-summary and resolved module dependencies, view the generated Mermaid source,
-and export it as an `.mmd` file. GUI orchestration remains separate from the
-scanner, analyzer, models, layout, and Canvas renderer.
+navigate focused Architecture and Calls graphs, inspect a selected callable's
+intra-function Flow, view details outside graph nodes, and export either the
+current view or the whole-project architecture as Mermaid. GUI orchestration
+remains separate from the scanner, analyzer, models, layout, and Canvas
+renderer.
 
 Common generated, environment, dependency, and cache directories such as
 `.git`, `.venv`, `__pycache__`, `node_modules`, `build`, and `dist` are excluded
@@ -57,6 +61,9 @@ For module identities, PySynoptic recognizes the conventional `src/` layout as
 well as flat projects. A project `src/` directory is treated as the most
 specific source root, while the project root remains available for top-level
 scripts. Namespace-style package directories do not require `__init__.py`.
+When the selected scan boundary is itself a regular Python package, package
+ancestry is inferred through parent `__init__.py` files without scanning any
+siblings outside the selected directory.
 
 Import resolution only compares AST metadata with the discovered project module
 identities. It never inspects the runtime environment, installed packages, or
@@ -130,8 +137,8 @@ python -m PyInstaller --noconfirm --clean packaging/pysynoptic.spec
 The unpacked application is written to `dist/PySynoptic/`. The same spec is
 executed independently on Windows x64 and Linux x64 because PyInstaller output
 is platform-specific. GitHub Actions smoke-tests each native GUI before
-creating versioned archives such as `PySynoptic-v0.0.10-Windows-x64.zip` and
-`PySynoptic-v0.0.10-Linux-x64.tar.gz`. After the release version bump, those
+creating versioned archives such as `PySynoptic-v0.0.11-Windows-x64.zip` and
+`PySynoptic-v0.0.11-Linux-x64.tar.gz`. After the release version bump, those
 names become `PySynoptic-v0.1.0-*` without changing the workflow.
 
 The bundle is windowed, keeps dependencies in an `_internal` directory, and
@@ -154,9 +161,9 @@ python -m pysynoptic.gui
 
 Use **Open Python File** for a single source file or **Open Project** for a
 directory, then select **Analyze**. Project analyses populate the project tree
-and the **Overview**, **Graph**, **Call Graph**, **Dependencies**, and
-**Mermaid** tabs. **Export Mermaid** becomes available after a project
-analysis.
+and the **Overview**, **Architecture**, **Calls**, **Flow**, **Dependencies**,
+and **Mermaid** tabs. The same graphical views are available for a standalone
+file. **Export Mermaid** becomes available after either kind of analysis.
 
 Analysis runs on a background daemon worker so filesystem scanning, AST parsing,
 import resolution, and conservative call resolution do not block Tk's event
@@ -165,18 +172,25 @@ are disabled, the status bar identifies the active target, and the notebook
 remains responsive. Only the newest submitted generation may update the GUI;
 late results from an earlier selection are discarded.
 
-In the **Graph** tab, drag an empty area to pan, use the mouse wheel or `+` and
-`−` controls to zoom, and select **Fit** to restore the complete view. Selecting
-a node emphasizes both incoming and outgoing dependencies while muting the
-rest of the graph. Selecting a Python module in the project tree opens the
-graph, selects the matching node, and centers it in the viewport.
+In **Architecture**, select a module to see its incoming and outgoing internal
+imports at depth one by default. Direction and depth controls expand that
+focused context; whole-project and cycle-only views remain explicit actions.
+Cyclic modules are highlighted, while the details panel lists dependencies,
+importers, imports, declarations, source path, and SCC membership.
 
-The **Call Graph** tab deliberately displays a bounded context instead of the
+The **Calls** tab deliberately displays a bounded context instead of the
 complete project's call-reference set. Search for a module or a fully qualified
 callable, choose **Outgoing**, **Incoming**, or **Both**, then select a depth of
-one, two, or three relationships. Changing either control rebuilds the pure
-logical subgraph before passing it through the same layout and Canvas used by
-the module graph. Double-click a visible callable to make it the new root.
+one, two, or three relationships. New callable roots default to **Both** at
+depth one. Boxes use short callable labels; the persistent details panel keeps
+qualified identity, source, resolution counts, callers, and callees.
+
+The **Flow** tab builds one callable's structural control-flow graph on demand.
+It distinguishes entry/exit, calls, conditions, loops, exception handlers,
+`finally`, returns, raises, breaks, and continues. Explicit edge labels explain
+branches and loop-back transitions. Flow construction reparses only the
+selected source with `ast.parse()` and reuses existing call-resolution results
+for proven call targets; it never imports or executes the file.
 
 The diagnostics panel distinguishes the number of visible nodes and edges from
 the selected root's direct incoming and outgoing dependencies. It also reports
@@ -263,11 +277,10 @@ runner invokes that controller on daemon threads and returns immutable states
 through a generation-tagged queue; Tk polls the queue with `after()` and remains
 the only thread that touches widgets. A deterministic pure-Python layout
 condenses strongly connected components, layers the resulting DAG, and
-positions any logical graph. Module dependencies and contextual call
-dependencies have separate pure builders but share that layout. The native Tk
-Canvas consumes only positioned values and owns viewport transforms, drawing,
-selection, and activation. Tk widgets remain responsible only for file dialogs
-and presenting completed state.
+positions any logical graph. Module dependencies, contextual call dependencies,
+and callable control flow have separate pure builders but share that layout and
+native Canvas. Mermaid can likewise consume the current renderer-independent
+graph, so `imports`, `calls`, and control-flow arrows are explicitly labeled.
 
 ## Generated architecture diagram
 
@@ -293,7 +306,10 @@ a stable order suitable for version control and exact-string testing.
   not visualize unresolved or dynamic expressions as speculative edges;
 - module roots can still produce a wide context in modules that declare many
   callables;
-- Mermaid output currently supports module dependencies only;
+- control-flow graphs are structural explanations, not compiler-perfect CFGs;
+- exception edges represent syntactic handlers rather than proving which
+  statement can raise, and abrupt exits inside `finally` are not modeled with
+  compiler-level precision;
 - building the project tree and initial module layout still occurs on the GUI
   thread after analysis, so presenting an exceptionally large completed result
   can cause a short pause;
@@ -303,8 +319,7 @@ a stable order suitable for version control and exact-string testing.
   preview;
 - resources are catalogued but not linked to Python code;
 - symbolic links are excluded rather than followed;
-- source roots configured through packaging metadata are not yet interpreted;
-- only the conventional top-level `src/` directory is detected specially.
+- source roots configured through packaging metadata are not yet interpreted.
 
 ## Short roadmap
 
@@ -318,6 +333,7 @@ a stable order suitable for version control and exact-string testing.
 - `0.0.8`: callable identities and unresolved static call references.
 - `0.0.9`: static call resolution.
 - `0.0.10`: interactive function call graph.
+- `0.0.11`: focused Architecture and Calls views plus callable control flow.
 - `0.1.0`: first public release.
 
 ## License
