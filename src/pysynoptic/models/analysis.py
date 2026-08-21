@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pysynoptic.models.imports import ImportReference
-from pysynoptic.models.symbols import CallableSymbol, CallReference
+from pysynoptic.models.symbols import CallableSymbol, CallReference, NameBinding
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,3 +22,4 @@ class FileAnalysis:
     import_references: tuple[ImportReference, ...] = ()
     callable_symbols: tuple[CallableSymbol, ...] = ()
     call_references: tuple[CallReference, ...] = ()
+    name_bindings: tuple[NameBinding, ...] = ()

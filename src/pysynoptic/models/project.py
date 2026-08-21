@@ -8,6 +8,7 @@ from typing import Literal, TypeAlias
 
 from pysynoptic.models.analysis import FileAnalysis
 from pysynoptic.models.imports import ImportReference
+from pysynoptic.models.symbols import CallableSymbol, CallReference
 
 ResourceKind: TypeAlias = Literal[
     "configuration",
@@ -21,6 +22,20 @@ ResourceKind: TypeAlias = Literal[
 ErrorOperation: TypeAlias = Literal["identity", "scan", "read"]
 ImportResolutionStatus: TypeAlias = Literal[
     "ambiguous", "external", "namespace", "resolved", "unresolved"
+]
+CallResolutionStatus: TypeAlias = Literal[
+    "ambiguous", "dynamic", "resolved", "unresolved"
+]
+CallResolutionReason: TypeAlias = Literal[
+    "ambiguous",
+    "dynamic",
+    "external",
+    "generic_attribute",
+    "imported",
+    "lexical",
+    "method",
+    "shadowed",
+    "unknown",
 ]
 
 
@@ -70,6 +85,39 @@ class ModuleDependency:
 
 
 @dataclass(frozen=True, slots=True)
+class CallableIdentity:
+    """A callable symbol paired with its project-aware module identity."""
+
+    module: ModuleIdentity
+    symbol: CallableSymbol
+
+    @property
+    def qualified_name(self) -> str:
+        """Return a stable human-readable project callable name."""
+        return f"{self.module.dotted_name}::{self.symbol.qualified_name}"
+
+
+@dataclass(frozen=True, slots=True)
+class CallResolution:
+    """Conservative project-level resolution of one static call reference."""
+
+    source: ModuleIdentity
+    reference: CallReference
+    status: CallResolutionStatus
+    reason: CallResolutionReason
+    targets: tuple[CallableIdentity, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class CallDependency:
+    """One deduplicated, confidently resolved callable dependency."""
+
+    source_module: ModuleIdentity
+    source_callable: CallableIdentity | None
+    target: CallableIdentity
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectScan:
     """Filesystem inventory produced without parsing Python source."""
 
@@ -94,3 +142,6 @@ class ProjectAnalysis:
     module_identities: tuple[ModuleIdentity, ...] = ()
     import_resolutions: tuple[ImportResolution, ...] = ()
     dependencies: tuple[ModuleDependency, ...] = ()
+    callable_identities: tuple[CallableIdentity, ...] = ()
+    call_resolutions: tuple[CallResolution, ...] = ()
+    call_dependencies: tuple[CallDependency, ...] = ()

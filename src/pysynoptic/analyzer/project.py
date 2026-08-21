@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pysynoptic.analyzer.call_resolution import resolve_project_calls
 from pysynoptic.analyzer.import_resolution import resolve_project_imports
 from pysynoptic.analyzer.module_identity import resolve_module_identities
 from pysynoptic.analyzer.python_file import analyze_python_file
@@ -30,6 +31,9 @@ def analyze_project(path: Path) -> ProjectAnalysis:
     import_resolutions, dependencies = resolve_project_imports(
         module_identities, file_analyses
     )
+    callable_identities, call_resolutions, call_dependencies = resolve_project_calls(
+        module_identities, file_analyses
+    )
 
     return ProjectAnalysis(
         root_path=scan.root_path,
@@ -42,4 +46,7 @@ def analyze_project(path: Path) -> ProjectAnalysis:
         module_identities=module_identities,
         import_resolutions=import_resolutions,
         dependencies=dependencies,
+        callable_identities=callable_identities,
+        call_resolutions=call_resolutions,
+        call_dependencies=call_dependencies,
     )

@@ -102,7 +102,7 @@ def analyze_python_file(path: Path) -> FileAnalysis:
         import_references.extend(references)
         imports.extend(_legacy_import_name(reference) for reference in references)
 
-    callable_symbols, call_references = analyze_callables(tree, path)
+    callable_symbols, call_references, name_bindings = analyze_callables(tree, path)
 
     return FileAnalysis(
         path=path,
@@ -113,4 +113,5 @@ def analyze_python_file(path: Path) -> FileAnalysis:
         import_references=tuple(import_references),
         callable_symbols=callable_symbols,
         call_references=call_references,
+        name_bindings=name_bindings,
     )

@@ -3,6 +3,9 @@
 from pysynoptic.models.analysis import FileAnalysis
 from pysynoptic.models.imports import ImportReference
 from pysynoptic.models.project import (
+    CallableIdentity,
+    CallDependency,
+    CallResolution,
     ImportResolution,
     ModuleDependency,
     ModuleIdentity,
@@ -11,16 +14,20 @@ from pysynoptic.models.project import (
     ProjectResource,
     ProjectScan,
 )
-from pysynoptic.models.symbols import CallableSymbol, CallReference
+from pysynoptic.models.symbols import CallableSymbol, CallReference, NameBinding
 
 __all__ = [
-    "CallReference",
+    "CallableIdentity",
     "CallableSymbol",
+    "CallDependency",
+    "CallReference",
+    "CallResolution",
     "FileAnalysis",
     "ImportReference",
     "ImportResolution",
     "ModuleIdentity",
     "ModuleDependency",
+    "NameBinding",
     "ProjectAnalysis",
     "ProjectError",
     "ProjectResource",
