@@ -16,7 +16,7 @@ project.
 
 ## Current capabilities
 
-Version `0.0.8` provides both the established command-line interface and an
+Version `0.0.9` provides both the established command-line interface and an
 interactive desktop interface. It analyzes either one `.py` file or a complete
 directory tree and reports:
 
@@ -26,6 +26,9 @@ directory tree and reports:
 - stable identities for functions, methods, and nested callable declarations;
 - unresolved call references with lexical scope, source position, and raw
   name, attribute, or dynamic-expression metadata;
+- conservative resolved, ambiguous, unresolved, and dynamic call results;
+- deterministic callable dependencies derived only from confidently resolved
+  calls;
 - structured `import x` and `from x import y` metadata from every lexical
   scope, including aliases, relative levels, and source positions;
 - syntax errors with their source location;
@@ -58,10 +61,35 @@ Import resolution only compares AST metadata with the discovered project module
 identities. It never inspects the runtime environment, installed packages, or
 the import system.
 
-Call references are deliberately not resolved in this version. PySynoptic
-records syntax such as `run()`, `service.run()`, and `registry[key]()` and
-attributes each expression to its module, class body, or enclosing callable.
-It does not yet claim which callable, if any, will run at runtime.
+## Conservative call resolution
+
+PySynoptic records syntax such as `run()`, `service.run()`, and
+`registry[key]()` and attributes each expression to its module, class body, or
+enclosing callable. Project analysis classifies every reference as:
+
+- **resolved** when exactly one callable is supported by the static models;
+- **ambiguous** when multiple callable declarations remain plausible;
+- **unresolved** when the syntax is static but available evidence is
+  insufficient or a name is shadowed;
+- **dynamic** when the callee itself is a runtime expression.
+
+High-confidence resolution currently covers module functions, lexical nested
+functions, same-module async callables, explicitly imported callables and
+aliases, imported module aliases and dotted module calls, and same-class
+`self.method()` or `cls.method()` references. Duplicate definitions are
+reported as ambiguous. Function arguments and obvious assignments suppress
+outer-name resolution rather than producing a speculative target.
+
+Generic `obj.method()` calls, inherited methods, computed callees such as
+`registry[key]()`, runtime-generated attributes, type inference, and nontrivial
+data flow are intentionally unsupported. PySynoptic does not claim complete
+Python call-graph accuracy.
+
+Call resolution preserves the static-analysis security boundary. It reads
+source as text and consumes AST and immutable analysis models only. It never
+loads analyzed packages, executes their imports, calls `importlib` or `inspect`
+on them, evaluates expressions, runs `eval` or `exec`, starts subprocesses, or
+performs runtime introspection.
 
 Imports inside functions, classes, branches, loops, context managers,
 `try`/`except`/`finally`, `match` cases, and `TYPE_CHECKING` blocks are all
@@ -202,14 +230,18 @@ a stable order suitable for version control and exact-string testing.
 
 ## Current limitations
 
-- declarations nested inside functions or classes are not catalogued;
+- nested non-callable declarations are not catalogued;
 - dynamic imports and calls to `__import__` are not interpreted;
 - external versus unresolved classification is based only on known project
   top-level names;
 - fileless namespace packages do not produce dependency edges themselves;
-- function calls are not resolved;
+- call resolution does not infer inheritance, receiver types, re-exports, or
+  nontrivial data flow;
+- a same-scope assignment conservatively blocks name resolution without
+  attempting statement-order analysis;
 - lambdas and other anonymous callable expressions do not receive symbol
   identities;
+- callable dependencies are available as data but do not yet have a GUI view;
 - Mermaid output currently supports module dependencies only;
 - analysis runs synchronously in the desktop application, so very large
   projects can temporarily block the interface;

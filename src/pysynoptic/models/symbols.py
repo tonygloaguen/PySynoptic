@@ -9,6 +9,7 @@ from typing import Literal, TypeAlias
 CallableKind: TypeAlias = Literal["function", "method"]
 CallKind: TypeAlias = Literal["attribute", "dynamic", "name"]
 CallScopeKind: TypeAlias = Literal["callable", "class", "module"]
+BindingKind: TypeAlias = Literal["argument", "assignment", "class", "import"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,3 +40,17 @@ class CallReference:
     scope_kind: CallScopeKind
     scope_name: str
     caller_symbol_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NameBinding:
+    """One lexical name binding relevant to conservative call resolution."""
+
+    path: Path
+    name: str
+    kind: BindingKind
+    line: int
+    column: int
+    scope_kind: CallScopeKind
+    scope_name: str
+    scope_symbol_id: str | None = None
