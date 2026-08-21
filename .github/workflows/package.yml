@@ -1,0 +1,126 @@
+name: Package Desktop
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/package.yml"
+      - "packaging/**"
+      - "pyproject.toml"
+      - "src/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/package.yml"
+      - "packaging/**"
+      - "pyproject.toml"
+      - "src/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: Linux x64
+            platform: Linux-x64
+            extension: tar.gz
+          - os: windows-latest
+            label: Windows x64
+            platform: Windows-x64
+            extension: zip
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          architecture: x64
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install project and packaging tools
+        run: python -m pip install -e ".[package]"
+
+      - name: Build onedir application
+        run: >-
+          python -m PyInstaller --noconfirm --clean
+          packaging/pysynoptic.spec
+
+      - name: Install Linux virtual display
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb
+
+      - name: Determine archive name
+        id: metadata
+        shell: bash
+        run: |
+          version="$(python -c 'import pysynoptic; print(pysynoptic.__version__)')"
+          archive="PySynoptic-v${version}-${{ matrix.platform }}.${{ matrix.extension }}"
+          echo "archive=${archive}" >> "${GITHUB_OUTPUT}"
+
+      - name: Smoke test Linux GUI
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set +e
+          xvfb-run -a timeout 5s dist/PySynoptic/PySynoptic
+          status=$?
+          set -e
+          if [ "${status}" -ne 124 ]; then
+            echo "Packaged GUI exited unexpectedly with status ${status}."
+            exit "${status}"
+          fi
+
+      - name: Smoke test Windows GUI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $process = Start-Process `
+            -FilePath "dist\PySynoptic\PySynoptic.exe" `
+            -PassThru
+          Start-Sleep -Seconds 5
+          if ($process.HasExited) {
+            throw "Packaged GUI exited unexpectedly with status $($process.ExitCode)."
+          }
+          Stop-Process -Id $process.Id
+
+      - name: Create Linux archive
+        if: runner.os == 'Linux'
+        shell: bash
+        run: >-
+          tar -C dist -czf
+          "dist/${{ steps.metadata.outputs.archive }}"
+          PySynoptic
+
+      - name: Create Windows archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          Compress-Archive
+          -Path "dist\PySynoptic"
+          -DestinationPath "dist\${{ steps.metadata.outputs.archive }}"
+
+      - name: Upload packaged application
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.metadata.outputs.archive }}
+          path: dist/${{ steps.metadata.outputs.archive }}
+          if-no-files-found: error
+          retention-days: 14

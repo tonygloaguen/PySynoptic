@@ -117,6 +117,27 @@ ruff format --check .
 python -m compileall src
 ```
 
+## Desktop packaging
+
+PySynoptic uses PyInstaller `onedir` bundles for its first desktop release.
+Install the pinned packaging tool and build from the repository root:
+
+```bash
+python -m pip install -e ".[package]"
+python -m PyInstaller --noconfirm --clean packaging/pysynoptic.spec
+```
+
+The unpacked application is written to `dist/PySynoptic/`. The same spec is
+executed independently on Windows x64 and Linux x64 because PyInstaller output
+is platform-specific. GitHub Actions smoke-tests each native GUI before
+creating versioned archives such as `PySynoptic-v0.0.10-Windows-x64.zip` and
+`PySynoptic-v0.0.10-Linux-x64.tar.gz`. After the release version bump, those
+names become `PySynoptic-v0.1.0-*` without changing the workflow.
+
+The bundle is windowed, keeps dependencies in an `_internal` directory, and
+does not use `onefile`, UPX, an installer, or an auto-update mechanism. No icon
+or platform signing is configured yet.
+
 ## Desktop application
 
 Launch the interface through its dedicated entry point:
