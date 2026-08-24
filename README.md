@@ -156,8 +156,8 @@ policy.
 
 ### Standalone application
 
-The `v0.1.0` release will provide native, self-contained assets built separately
-for each platform:
+The `v0.1.0` release provides native, self-contained assets built separately for
+each platform:
 
 - `PySynoptic-v0.1.0-Windows-x64.zip`
 - `PySynoptic-v0.1.0-Linux-x64.tar.gz`
