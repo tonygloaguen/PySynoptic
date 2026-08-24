@@ -1,256 +1,261 @@
 # PySynoptic
 
+Understand Python architecture, calls, and control flow without executing the
+analyzed code.
+
 [![CI](https://github.com/tonygloaguen/PySynoptic/actions/workflows/ci.yml/badge.svg)](https://github.com/tonygloaguen/PySynoptic/actions/workflows/ci.yml)
+[![Python 3.11–3.14](https://img.shields.io/badge/Python-3.11%E2%80%933.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-PySynoptic is an open-source static analysis tool for exploring the structure of
-Python source code. Its long-term goal is to turn a file or a project into a
-clear, navigable synopsis of modules, declarations, and their relationships.
+![PySynoptic focused call graph](docs/images/calls.png)
 
-## Static analysis only
+## What is PySynoptic?
 
-PySynoptic **never executes or imports analyzed code**. Project discovery only
-inspects the filesystem. The analysis engine reads each selected Python source
-file as text and passes it to Python's `ast.parse()` parser. It does not use
-`importlib`, evaluate source expressions, or start subprocesses from an analyzed
-project.
+PySynoptic is an open-source static Python code explorer for a single `.py`
+file or an entire project. Its focused desktop views connect three levels of
+understanding:
 
-## Current capabilities
+- **Architecture** — dependencies between modules;
+- **Calls** — callable relationships supported by strong static evidence;
+- **Flow** — control structure inside one function or method.
 
-Version `0.0.11` provides both the established command-line interface and an
-interactive desktop interface. It analyzes either one `.py` file or a complete
-directory tree and reports:
+The result is a navigable synopsis of an unfamiliar codebase, from its package
+shape down to branches, loops, exception handlers, and returns.
 
-- the file path and inferred module name;
-- top-level synchronous and asynchronous functions;
-- top-level classes;
-- stable identities for functions, methods, and nested callable declarations;
-- unresolved call references with lexical scope, source position, and raw
-  name, attribute, or dynamic-expression metadata;
-- conservative resolved, ambiguous, unresolved, and dynamic call results;
-- deterministic callable dependencies derived only from confidently resolved
-  calls;
-- contextual, interactive call graphs bounded by root, direction, and depth;
-- focused module architecture graphs with cycle discovery and module details;
-- on-demand, AST-only intra-function flow graphs for branches, loops,
-  exception handling, calls, and terminating statements;
-- structured `import x` and `from x import y` metadata from every lexical
-  scope, including aliases, relative levels, and source positions;
-- syntax errors with their source location;
-- recursively discovered Python files, including package entry points;
-- stable project-aware dotted module identities;
-- resolved, external, unresolved, ambiguous, and namespace import references;
-- deterministic, deduplicated dependencies between file-backed modules;
-- deterministic Mermaid flowcharts generated directly from project analyses;
-- non-Python project resources grouped by broad type;
-- excluded paths and recoverable filesystem or source-reading errors.
+## Why PySynoptic?
 
-The desktop application lets the user select a Python file or project, start
-the same static analysis used by the CLI, browse the discovered project tree,
-navigate focused Architecture and Calls graphs, inspect a selected callable's
-intra-function Flow, view details outside graph nodes, and export either the
-current view or the whole-project architecture as Mermaid. GUI orchestration
-remains separate from the scanner, analyzer, models, layout, and Canvas
-renderer.
+Understanding unfamiliar Python often means manually following imports across
+modules, locating declarations, tracing calls, and then reading each condition,
+loop, and exception path. Large all-at-once diagrams are rarely better.
 
-Common generated, environment, dependency, and cache directories such as
-`.git`, `.venv`, `__pycache__`, `node_modules`, `build`, and `dist` are excluded
-without being traversed. One invalid or unreadable Python file does not prevent
-the remaining project from being analyzed.
+PySynoptic turns the same static information into bounded, interactive views.
+Choose a module or callable, select a direction and depth, and expand the part
+of the program that matters now.
 
-For module identities, PySynoptic recognizes the conventional `src/` layout as
-well as flat projects. A project `src/` directory is treated as the most
-specific source root, while the project root remains available for top-level
-scripts. Namespace-style package directories do not require `__init__.py`.
-When the selected scan boundary is itself a regular Python package, package
-ancestry is inferred through parent `__init__.py` files without scanning any
-siblings outside the selected directory.
+## Key features
 
-Import resolution only compares AST metadata with the discovered project module
-identities. It never inspects the runtime environment, installed packages, or
-the import system.
+- single-file and recursive project analysis;
+- stable module identity and internal dependency resolution;
+- interactive, focused Architecture view with cycle discovery;
+- callable inventory and conservative static call resolution;
+- bounded Calls graphs with incoming, outgoing, and bidirectional exploration;
+- per-callable Flow graphs for branches, loops, exceptions, calls, and exits;
+- short graph labels backed by detailed source and relationship panels;
+- pan, zoom, fit, focus navigation, and contextual Mermaid export;
+- asynchronous analysis that keeps the desktop interface responsive;
+- deterministic AST/model output suitable for tests and version control;
+- standalone Windows x64 and Linux x64 packaging;
+- a deliberate static-analysis-only security boundary.
 
-## Conservative call resolution
+## Screenshots
 
-PySynoptic records syntax such as `run()`, `service.run()`, and
-`registry[key]()` and attributes each expression to its module, class body, or
-enclosing callable. Project analysis classifies every reference as:
+All screenshots below are from the current PySynoptic application analyzing its
+own source tree.
 
-- **resolved** when exactly one callable is supported by the static models;
-- **ambiguous** when multiple callable declarations remain plausible;
-- **unresolved** when the syntax is static but available evidence is
-  insufficient or a name is shadowed;
-- **dynamic** when the callee itself is a runtime expression.
+### Overview
 
-High-confidence resolution currently covers module functions, lexical nested
-functions, same-module async callables, explicitly imported callables and
-aliases, imported module aliases and dotted module calls, and same-class
-`self.method()` or `cls.method()` references. Duplicate definitions are
-reported as ambiguous. Function arguments and obvious assignments suppress
-outer-name resolution rather than producing a speculative target.
+![Project overview](docs/images/overview.png)
 
-Generic `obj.method()` calls, inherited methods, computed callees such as
-`registry[key]()`, runtime-generated attributes, type inference, and nontrivial
-data flow are intentionally unsupported. PySynoptic does not claim complete
-Python call-graph accuracy.
+The Overview summarizes files, modules, declarations, dependencies, resolved
+call relationships, cycles, and analysis diagnostics before deeper
+exploration.
 
-Call resolution preserves the static-analysis security boundary. It reads
-source as text and consumes AST and immutable analysis models only. It never
-loads analyzed packages, executes their imports, calls `importlib` or `inspect`
-on them, evaluates expressions, runs `eval` or `exec`, starts subprocesses, or
-performs runtime introspection.
+### Architecture
 
-Imports inside functions, classes, branches, loops, context managers,
-`try`/`except`/`finally`, `match` cases, and `TYPE_CHECKING` blocks are all
-recorded. PySynoptic does not predict whether a branch executes; every import
-present in the static syntax tree contributes to the analysis.
+![Focused module architecture](docs/images/architecture.png)
 
-## Developer installation
+An Architecture arrow means **importing module → imported module**. Focus on a
+module and inspect its outgoing dependencies, incoming importers, declarations,
+source path, and cycle membership. Direction and depth controls keep the view
+bounded; cycle-only and whole-project views remain available explicitly.
 
-Python 3.11 or newer is required. From a clone of the repository:
+### Calls
+
+![Focused callable relationships](docs/images/calls.png)
+
+A Calls arrow means **caller → callee**. Search for a module or callable, then
+explore Incoming, Outgoing, or Both at depth 1, 2, or 3. Only conservatively
+resolved relationships become graph edges; unresolved, ambiguous, and dynamic
+references remain visible as diagnostics rather than speculative links.
+
+### Flow
+
+![Function control flow](docs/images/flow.png)
+
+Flow explains the structure inside one callable. It represents `if`/`else`,
+`for`/`while`, `try`/`except`/`finally`, `break`, `continue`, `raise`, `return`,
+and call steps. Labeled transitions distinguish branches, loop backs, exception
+paths, and exits. This view of `_add_argument_bindings()` exposes two loops and
+a conditional without expanding the rest of the project.
+
+## Standalone Python files
+
+PySynoptic is not limited to package trees. Open one `.py` file to see its
+functions, classes, methods, imports, call references, conservatively resolved
+local callable relationships, focused Calls view, and per-function Flow. A
+single-module Architecture view states that there is only one module rather
+than presenting an empty graph.
+
+## How it works
+
+```mermaid
+flowchart TD
+    source[Python source] --> scanner[Filesystem scanner]
+    scanner --> ast[AST parsing]
+    ast --> imports[Imports and modules]
+    ast --> calls[Callables and call references]
+    ast --> flow[Targeted control flow]
+    imports --> resolvers[Static resolvers and models]
+    calls --> resolvers
+    flow --> resolvers
+    resolvers --> architecture[Architecture]
+    resolvers --> call_view[Calls]
+    resolvers --> flow_view[Flow]
+    architecture --> output[GUI and Mermaid]
+    call_view --> output
+    flow_view --> output
+```
+
+The scanner inventories files and resources. Python source is read as text and
+parsed with `ast.parse()`. Analyzer layers interpret syntax into immutable
+models; graph builders and renderers consume those models. **Source from the
+analyzed project is never imported or executed.**
+
+## Static analysis philosophy
+
+Python permits runtime behavior that source alone cannot always prove.
+PySynoptic therefore classifies every call reference explicitly:
+
+- **Resolved** — strong static evidence identifies exactly one target.
+- **Ambiguous** — more than one statically valid target remains.
+- **Unresolved** — the syntax is understood, but available evidence is
+  insufficient or a name is shadowed.
+- **Dynamic** — runtime computation prevents reliable static resolution.
+
+PySynoptic prefers an unresolved result over a speculative false positive.
+Resolution covers cases such as lexical functions, explicit imports and aliases,
+and same-class `self.method()` or `cls.method()` calls. It does not claim a
+complete Python call graph.
+
+## Security model
+
+Analyzed code is **never**:
+
+- imported or loaded as a package;
+- executed directly;
+- evaluated with `eval` or `exec`;
+- launched through a subprocess;
+- inspected through runtime module loading or introspection.
+
+Analysis uses filesystem metadata, source text, Python's AST, and static models.
+This is an architectural security boundary, not merely a usage convention. See
+[SECURITY.md](SECURITY.md) for vulnerability reporting and the supported-release
+policy.
+
+## Installation
+
+### Standalone application
+
+The `v0.1.0` release will provide native, self-contained assets built separately
+for each platform:
+
+- `PySynoptic-v0.1.0-Windows-x64.zip`
+- `PySynoptic-v0.1.0-Linux-x64.tar.gz`
+
+Download an archive from [GitHub Releases](https://github.com/tonygloaguen/PySynoptic/releases).
+
+On Windows, extract the complete ZIP and launch `PySynoptic.exe`. Keep the
+`_internal` directory beside the executable. Windows SmartScreen may display a
+warning because the first public release is not code-signed; this does not mean
+the application failed to start.
+
+On Linux, extract the archive and run the `PySynoptic` executable inside the
+directory. A graphical desktop is required. The bundle is built natively and
+does not require a separate Python installation.
+
+### From source
+
+Python 3.11 or newer is required.
 
 ```bash
+git clone https://github.com/tonygloaguen/PySynoptic.git
+cd PySynoptic
 python -m venv .venv
+```
+
+Activate the environment:
+
+```bash
+# Linux
 source .venv/bin/activate
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+```
+
+Install and launch:
+
+```bash
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
-Run the quality checks with:
-
-```bash
-pytest
-ruff check .
-ruff format --check .
-python -m compileall src
-```
-
-## Desktop packaging
-
-PySynoptic uses PyInstaller `onedir` bundles for its first desktop release.
-Install the pinned packaging tool and build from the repository root:
-
-```bash
-python -m pip install -e ".[package]"
-python -m PyInstaller --noconfirm --clean packaging/pysynoptic.spec
-```
-
-The unpacked application is written to `dist/PySynoptic/`. The same spec is
-executed independently on Windows x64 and Linux x64 because PyInstaller output
-is platform-specific. GitHub Actions smoke-tests each native GUI before
-creating versioned archives such as `PySynoptic-v0.0.11-Windows-x64.zip` and
-`PySynoptic-v0.0.11-Linux-x64.tar.gz`. After the release version bump, those
-names become `PySynoptic-v0.1.0-*` without changing the workflow.
-
-The bundle is windowed, keeps dependencies in an `_internal` directory, and
-does not use `onefile`, UPX, an installer, or an auto-update mechanism. No icon
-or platform signing is configured yet.
-
-## Desktop application
-
-Launch the interface through its dedicated entry point:
-
-```bash
+python -m pip install -e .
 pysynoptic-gui
 ```
 
-or directly as a Python module:
+For development tools:
 
 ```bash
+python -m pip install -e ".[dev]"
+```
+
+## Using the desktop application
+
+1. Select **Open Python File** or **Open Project**.
+2. Select **Analyze**.
+3. Read the project or file summary in **Overview**.
+4. Explore module imports in **Architecture**.
+5. Search for callable relationships in **Calls**.
+6. Open one function or method in **Flow**.
+7. Export the current Architecture, Calls, or Flow view as Mermaid.
+
+Architecture and Calls support focused exploration with **Incoming**,
+**Outgoing**, or **Both** and a depth of 1, 2, or 3. Double-clicking a graph node
+makes it the new focus. Graph nodes keep labels short; the side panel provides
+qualified names, paths, line numbers, diagnostics, callers, and callees.
+
+Launch the source installation with:
+
+```bash
+pysynoptic-gui
+# or
 python -m pysynoptic.gui
 ```
 
-Use **Open Python File** for a single source file or **Open Project** for a
-directory, then select **Analyze**. Project analyses populate the project tree
-and the **Overview**, **Architecture**, **Calls**, **Flow**, **Dependencies**,
-and **Mermaid** tabs. The same graphical views are available for a standalone
-file. **Export Mermaid** becomes available after either kind of analysis.
+## CLI
 
-Analysis runs on a background daemon worker so filesystem scanning, AST parsing,
-import resolution, and conservative call resolution do not block Tk's event
-loop. While work is pending, project-selection, analysis, and export controls
-are disabled, the status bar identifies the active target, and the notebook
-remains responsive. Only the newest submitted generation may update the GUI;
-late results from an earlier selection are discarded.
-
-In **Architecture**, select a module to see its incoming and outgoing internal
-imports at depth one by default. Direction and depth controls expand that
-focused context; whole-project and cycle-only views remain explicit actions.
-Cyclic modules are highlighted, while the details panel lists dependencies,
-importers, imports, declarations, source path, and SCC membership.
-
-The **Calls** tab deliberately displays a bounded context instead of the
-complete project's call-reference set. Search for a module or a fully qualified
-callable, choose **Outgoing**, **Incoming**, or **Both**, then select a depth of
-one, two, or three relationships. New callable roots default to **Both** at
-depth one. Boxes use short callable labels; the persistent details panel keeps
-qualified identity, source, resolution counts, callers, and callees.
-
-The **Flow** tab builds one callable's structural control-flow graph on demand.
-It distinguishes entry/exit, calls, conditions, loops, exception handlers,
-`finally`, returns, raises, breaks, and continues. Explicit edge labels explain
-branches and loop-back transitions. Flow construction reparses only the
-selected source with `ast.parse()` and reuses existing call-resolution results
-for proven call targets; it never imports or executes the file.
-
-The diagnostics panel distinguishes the number of visible nodes and edges from
-the selected root's direct incoming and outgoing dependencies. It also reports
-resolved, ambiguous, unresolved, and dynamic references attributed to that
-root. A module root groups its module-level references and all declared
-callables in the module; a callable root focuses on one declaration.
-
-The desktop layer uses `ttkbootstrap` for native Tk widgets and styling. It
-delegates all analysis and rendering to the existing public engine APIs; it
-does not execute or import selected source code.
-
-## CLI usage
-
-After installation, analyze a file or a project directory with either entry
-point:
+Analyze a single file:
 
 ```bash
 pysynoptic path/to/module.py
-python -m pysynoptic path/to/module.py
-pysynoptic path/to/project
-pysynoptic path/to/project --format mermaid
-pysynoptic path/to/project --format mermaid --output dependencies.mmd
 ```
 
-Example output:
+Analyze a project directory:
 
-```text
-File: path/to/module.py
-Module: module
-Functions: main, load_config
-Classes: Application
-Imports: argparse, pathlib.Path
+```bash
+pysynoptic path/to/project/
 ```
 
-Project output starts with a concise summary and then lists every discovered
-Python file:
+Generate Mermaid for a project, either on standard output or in a file:
 
-```text
-Project: example
-Python files: 3
-Resources: 2
-Functions: 5
-Classes: 1
-Syntax errors: 0
-Dependencies: 2
-
-Files:
-- package
-  package/__init__.py
-- package.__main__
-  package/__main__.py
-- package.service
-  package/service.py
-
-Dependencies:
-- package -> package.service
-- package.__main__ -> package.service
+```bash
+pysynoptic path/to/project/ --format mermaid
+pysynoptic path/to/project/ --format mermaid --output dependencies.mmd
 ```
 
-The analysis engine is also available independently of the CLI:
+Text output can also be written with `--output`. Mermaid CLI export currently
+requires a project directory; contextual Architecture, Calls, and Flow exports
+are available from the desktop application.
+
+The analysis API can be used independently of the CLI:
 
 ```python
 from pathlib import Path
@@ -262,80 +267,37 @@ project_analysis = analyze_project(Path("path/to/project"))
 mermaid = render_mermaid(project_analysis)
 ```
 
-The scanner is a separate layer from Python AST analysis: it inventories files
-and resources but never parses source itself. Module identity resolution is a
-separate project-analysis step and does not modify the single-file analyzer's
-stem-based `module_name`. Project-level import resolution consumes structured
-AST metadata and emits a logical dependency graph as immutable Python data.
-The Mermaid renderer consumes only this completed `ProjectAnalysis`; it never
-reads or imports analyzed source code.
-
-The desktop layer follows the same boundary. Its immutable application state
-contains the selected target and completed analysis values, while a small
-controller coordinates the existing public APIs. A headless-safe background
-runner invokes that controller on daemon threads and returns immutable states
-through a generation-tagged queue; Tk polls the queue with `after()` and remains
-the only thread that touches widgets. A deterministic pure-Python layout
-condenses strongly connected components, layers the resulting DAG, and
-positions any logical graph. Module dependencies, contextual call dependencies,
-and callable control flow have separate pure builders but share that layout and
-native Canvas. Mermaid can likewise consume the current renderer-independent
-graph, so `imports`, `calls`, and control-flow arrows are explicitly labeled.
-
-## Generated architecture diagram
-
-PySynoptic generates its own dependency diagram at
-[`docs/pysynoptic-dependencies.mmd`](docs/pysynoptic-dependencies.mmd). Nodes
-are grouped by their top-level package, and both nodes and edges are emitted in
-a stable order suitable for version control and exact-string testing.
-
 ## Current limitations
 
-- nested non-callable declarations are not catalogued;
-- dynamic imports and calls to `__import__` are not interpreted;
-- external versus unresolved classification is based only on known project
-  top-level names;
-- fileless namespace packages do not produce dependency edges themselves;
-- call resolution does not infer inheritance, receiver types, re-exports, or
-  nontrivial data flow;
-- a same-scope assignment conservatively blocks name resolution without
-  attempting statement-order analysis;
-- lambdas and other anonymous callable expressions do not receive symbol
-  identities;
-- call-graph navigation shows only conservative resolved dependencies and does
-  not visualize unresolved or dynamic expressions as speculative edges;
-- module roots can still produce a wide context in modules that declare many
-  callables;
-- control-flow graphs are structural explanations, not compiler-perfect CFGs;
-- exception edges represent syntactic handlers rather than proving which
-  statement can raise, and abrupt exits inside `finally` are not modeled with
-  compiler-level precision;
-- building the project tree and initial module layout still occurs on the GUI
-  thread after analysis, so presenting an exceptionally large completed result
-  can cause a short pause;
-- the dependency layout is optimized for small and medium projects and does
-  not yet provide filtering or package collapsing;
-- Mermaid is displayed and exported as source text, without an embedded visual
-  preview;
-- resources are catalogued but not linked to Python code;
-- symbolic links are excluded rather than followed;
-- source roots configured through packaging metadata are not yet interpreted.
+- Python is dynamic, so not every call can be resolved statically.
+- Generic `obj.method()` calls usually require runtime or type information.
+- Inheritance, receiver-type inference, runtime tracing, debugging, and
+  profiling are outside the current scope.
+- Flow graphs are structural explanations rather than compiler-perfect CFGs.
+- Exception flow is syntactic and conservative; it does not prove which
+  statement raises.
+- Unresolved and dynamic calls are not shown as proven graph edges.
+- Very large global graphs can still be dense; focused views are the primary
+  navigation model.
+- Mermaid is exported as source text without an embedded preview.
+- Windows bundles are not code-signed.
+- Linux bundle compatibility depends on the build environment and compatible
+  `glibc`.
+- No macOS bundle is available yet.
 
-## Short roadmap
+These are deliberate scope boundaries for the first public release, not claims
+of complete Python runtime analysis.
 
-- `0.0.1`: single-file static analysis.
-- `0.0.2`: recursive project analysis.
-- `0.0.3`: project-aware module identities.
-- `0.0.4`: static import resolution.
-- `0.0.5`: deterministic Mermaid export.
-- `0.0.6`: first usable desktop GUI.
-- `0.0.7`: navigable graphical preview.
-- `0.0.8`: callable identities and unresolved static call references.
-- `0.0.9`: static call resolution.
-- `0.0.10`: interactive function call graph.
-- `0.0.11`: focused Architecture and Calls views plus callable control flow.
-- `0.1.0`: first public release.
+## Contributing and project documents
+
+- [Contributing guide](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+- [Security policy](SECURITY.md)
+- [Generated dependency diagram](docs/pysynoptic-dependencies.mmd)
+
+Contributions must preserve the static-analysis boundary: analyzed project code
+must never be imported or executed.
 
 ## License
 
-PySynoptic is distributed under the MIT License. See [`LICENSE`](LICENSE).
+PySynoptic is released under the [MIT License](LICENSE).
