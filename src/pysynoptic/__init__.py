@@ -49,4 +49,4 @@ __all__ = [
     "render_mermaid_export",
     "write_mermaid",
 ]
-__version__ = "0.0.11"
+__version__ = "0.1.0"
