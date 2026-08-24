@@ -1,7 +1,7 @@
 # PySynoptic
 
-Understand Python architecture, calls, and control flow without executing the
-analyzed code.
+Understand Python architecture, calls, control flow, and the statically
+observable purpose of code without executing the analyzed project.
 
 [![CI](https://github.com/tonygloaguen/PySynoptic/actions/workflows/ci.yml/badge.svg)](https://github.com/tonygloaguen/PySynoptic/actions/workflows/ci.yml)
 [![Python 3.11–3.14](https://img.shields.io/badge/Python-3.11%E2%80%933.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -17,7 +17,9 @@ understanding:
 
 - **Architecture** — dependencies between modules;
 - **Calls** — callable relationships supported by strong static evidence;
-- **Flow** — control structure inside one function or method.
+- **Flow** — control structure inside one function or method;
+- **Insights** — deterministic explanations of modules, classes, functions,
+  and methods, with evidence and qualitative confidence.
 
 The result is a navigable synopsis of an unfamiliar codebase, from its package
 shape down to branches, loops, exception handlers, and returns.
@@ -40,6 +42,8 @@ of the program that matters now.
 - callable inventory and conservative static call resolution;
 - bounded Calls graphs with incoming, outgoing, and bidirectional exploration;
 - per-callable Flow graphs for branches, loops, exceptions, calls, and exits;
+- deterministic Static Insights for code roles, purposes, inputs, outputs,
+  side effects, and supporting evidence;
 - short graph labels backed by detailed source and relationship panels;
 - pan, zoom, fit, focus navigation, and contextual Mermaid export;
 - asynchronous analysis that keeps the desktop interface responsive;
@@ -88,6 +92,16 @@ and call steps. Labeled transitions distinguish branches, loop backs, exception
 paths, and exits. This view of `analyze_project()` connects its selected tree
 entry and call context to the loop and exception path inside the function.
 
+### Insights
+
+![Static Insight for analyze_project](docs/images/insights.png)
+
+Insights provides deterministic static explanations for modules, classes,
+functions, and methods. Each card leads with a concise **Role**, **Purpose**,
+and qualitative **Confidence**, then exposes responsibilities, inputs, outputs,
+side effects, callers/callees, and the static **Evidence** behind the result.
+Evidence stays collapsed by default so the explanation remains readable.
+
 ## Standalone Python files
 
 PySynoptic is not limited to package trees. Open one `.py` file to see its
@@ -105,21 +119,51 @@ flowchart TD
     ast --> imports[Imports and modules]
     ast --> calls[Callables and call references]
     ast --> flow[Targeted control flow]
+    ast --> facts[Static facts and evidence]
     imports --> resolvers[Static resolvers and models]
     calls --> resolvers
     flow --> resolvers
+    facts --> insights[Structured Insights]
     resolvers --> architecture[Architecture]
     resolvers --> call_view[Calls]
     resolvers --> flow_view[Flow]
     architecture --> output[GUI and Mermaid]
     call_view --> output
     flow_view --> output
+    insights --> output
 ```
 
 The scanner inventories files and resources. Python source is read as text and
 parsed with `ast.parse()`. Analyzer layers interpret syntax into immutable
 models; graph builders and renderers consume those models. **Source from the
 analyzed project is never imported or executed.**
+
+## Static Insights
+
+Static Insights answers “What is this code element for?” from locally derived
+AST facts and the existing static models. It reports:
+
+- **Role** — a conservative category such as analyzer, parser, renderer, or
+  orchestrator;
+- **Purpose** — either author-declared information from a docstring or a
+  clearly identified static inference;
+- **Confidence** — evidence quality, never a probability;
+- **Inputs / Outputs / Side effects** — statically observable interface and
+  operations;
+- **Evidence** — the exact signals that support the explanation.
+
+Confidence levels mean:
+
+- **HIGH** — multiple converging static signals;
+- **MEDIUM** — useful static evidence with limitations;
+- **UNKNOWN** — insufficient evidence for a reliable role.
+
+PySynoptic prefers **Unknown** over a convincing but unsupported explanation.
+Insights does not require AI or an external service, sends no analyzed source
+code elsewhere, and remains deterministic for the same source and version.
+Docstrings are identified as author-declared information; inferred purposes
+are presented separately. Insights are conservative explanations, not a claim
+that every inferred role or purpose is always correct.
 
 ## Static analysis philosophy
 
@@ -147,7 +191,8 @@ Analyzed code is **never**:
 - launched through a subprocess;
 - inspected through runtime module loading or introspection.
 
-Analysis uses filesystem metadata, source text, Python's AST, and static models.
+Analysis, including Insights, uses filesystem metadata, source text, Python's
+AST, and static models locally. No analyzed source is transmitted externally.
 This is an architectural security boundary, not merely a usage convention. See
 [SECURITY.md](SECURITY.md) for vulnerability reporting and the supported-release
 policy.
@@ -156,11 +201,11 @@ policy.
 
 ### Standalone application
 
-The `v0.1.0` release provides native, self-contained assets built separately for
+The `v0.2.0` release provides native, self-contained assets built separately for
 each platform:
 
-- `PySynoptic-v0.1.0-Windows-x64.zip`
-- `PySynoptic-v0.1.0-Linux-x64.tar.gz`
+- `PySynoptic-v0.2.0-Windows-x64.zip`
+- `PySynoptic-v0.2.0-Linux-x64.tar.gz`
 
 Download an archive from [GitHub Releases](https://github.com/tonygloaguen/PySynoptic/releases).
 
@@ -215,7 +260,9 @@ python -m pip install -e ".[dev]"
 4. Explore module imports in **Architecture**.
 5. Search for callable relationships in **Calls**.
 6. Open one function or method in **Flow**.
-7. Export the current Architecture, Calls, or Flow view as Mermaid.
+7. Read its role, purpose, confidence, interface, side effects, and evidence in
+   **Insights**.
+8. Export the current Architecture, Calls, or Flow view as Mermaid.
 
 Architecture and Calls support focused exploration with **Incoming**,
 **Outgoing**, or **Both** and a depth of 1, 2, or 3. Double-clicking a graph node
@@ -284,9 +331,12 @@ mermaid = render_mermaid(project_analysis)
 - Linux bundle compatibility depends on the build environment and compatible
   `glibc`.
 - No macOS bundle is available yet.
+- Static Insights can remain Unknown when the available source does not provide
+  enough reliable evidence, and inferred purposes are not guaranteed to match
+  every author's intent.
 
-These are deliberate scope boundaries for the first public release, not claims
-of complete Python runtime analysis.
+These are deliberate scope boundaries, not claims of complete Python runtime
+analysis or infallible code understanding.
 
 ## Contributing and project documents
 
