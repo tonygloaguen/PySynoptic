@@ -23,7 +23,6 @@ OperationCategory: TypeAlias = Literal[
     "network",
     "process",
 ]
-InsightConfidence: TypeAlias = Literal["high", "medium", "unknown"]
 
 
 class EvidenceCategory(StrEnum):
@@ -75,6 +74,23 @@ class InsightRole(StrEnum):
     FACTORY = "factory"
     UTILITY = "utility"
     UNKNOWN = "unknown"
+
+
+class InsightConfidence(StrEnum):
+    """Quality of the static support behind an Insight, never a probability."""
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    UNKNOWN = "unknown"
+
+
+class PurposeSource(StrEnum):
+    """Provenance of a generated short purpose."""
+
+    DOCSTRING = "docstring"
+    ROLE_TEMPLATE = "role_template"
+    STRUCTURE = "structure"
+    NONE = "none"
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,54 +252,97 @@ class PurposeResult:
     """One short deterministic purpose and the Evidence supporting it."""
 
     text: str | None
+    source: PurposeSource = PurposeSource.NONE
     supporting_evidence: tuple[InsightEvidence, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
-class ModuleInsight:
-    """Future classified presentation for a module; not produced yet."""
+class InsightInput:
+    """One declared callable input, without inferred semantics."""
 
-    module: str
+    name: str
+    kind: ArgumentKind
+    annotation: str | None = None
+    default: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ModuleInsight:
+    """Structured static understanding of one module."""
+
+    identity: str
+    display_name: str
     path: Path
-    purpose: str
-    role: str
-    responsibilities: tuple[str, ...]
-    inputs: tuple[str, ...]
-    outputs: tuple[str, ...]
-    side_effects: tuple[str, ...]
-    evidence: tuple[InsightEvidence, ...]
+    role: InsightRole
+    secondary_roles: tuple[InsightRole, ...]
+    purpose: str | None
+    purpose_source: PurposeSource
     confidence: InsightConfidence
+    responsibilities: tuple[str, ...] = ()
+    inputs: tuple[InsightInput, ...] = ()
+    outputs: tuple[str, ...] = ()
+    side_effects: tuple[str, ...] = ()
+    evidence: tuple[InsightEvidence, ...] = ()
+    supporting_evidence: tuple[InsightEvidence, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class ClassInsight:
-    """Future classified presentation for a class; not produced yet."""
+    """Structured static understanding of one class."""
 
+    identity: str
+    display_name: str
     module: str
     path: Path
     qualified_name: str
-    purpose: str
-    role: str
-    responsibilities: tuple[str, ...]
-    inputs: tuple[str, ...]
-    outputs: tuple[str, ...]
-    side_effects: tuple[str, ...]
-    evidence: tuple[InsightEvidence, ...]
+    role: InsightRole
+    secondary_roles: tuple[InsightRole, ...]
+    purpose: str | None
+    purpose_source: PurposeSource
     confidence: InsightConfidence
+    responsibilities: tuple[str, ...] = ()
+    inputs: tuple[InsightInput, ...] = ()
+    outputs: tuple[str, ...] = ()
+    side_effects: tuple[str, ...] = ()
+    evidence: tuple[InsightEvidence, ...] = ()
+    supporting_evidence: tuple[InsightEvidence, ...] = ()
+    is_dataclass: bool = False
+    field_count: int = 0
+    method_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
 class CallableInsight:
-    """Future classified presentation for a callable; not produced yet."""
+    """Structured static understanding of one function or method."""
 
+    identity: str
+    display_name: str
     module: str
     path: Path
+    symbol_id: str
     qualified_name: str
-    purpose: str
-    role: str
-    responsibilities: tuple[str, ...]
-    inputs: tuple[str, ...]
-    outputs: tuple[str, ...]
-    side_effects: tuple[str, ...]
-    evidence: tuple[InsightEvidence, ...]
+    kind: CallableKind
+    is_async: bool
+    source_line: int
+    role: InsightRole
+    secondary_roles: tuple[InsightRole, ...]
+    purpose: str | None
+    purpose_source: PurposeSource
     confidence: InsightConfidence
+    responsibilities: tuple[str, ...] = ()
+    inputs: tuple[InsightInput, ...] = ()
+    outputs: tuple[str, ...] = ()
+    side_effects: tuple[str, ...] = ()
+    callers: tuple[str, ...] = ()
+    callees: tuple[str, ...] = ()
+    evidence: tuple[InsightEvidence, ...] = ()
+    supporting_evidence: tuple[InsightEvidence, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class InsightAnalysis:
+    """Deterministically ordered Structured Insights for one analysis context."""
+
+    modules: tuple[ModuleInsight, ...]
+    classes: tuple[ClassInsight, ...]
+    callables: tuple[CallableInsight, ...]

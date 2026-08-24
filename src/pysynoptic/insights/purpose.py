@@ -13,6 +13,7 @@ from pysynoptic.insights.models import (
     InsightRole,
     ModuleFacts,
     PurposeResult,
+    PurposeSource,
     RoleClassification,
 )
 
@@ -122,7 +123,11 @@ def _useful_docstring(evidence: tuple[InsightEvidence, ...]) -> PurposeResult | 
     words = re.findall(r"[A-Za-z0-9]+", summary.casefold())
     if not summary or len(words) < 2 or words[0] in _UNHELPFUL_DOCSTRINGS:
         return None
-    return PurposeResult(_sentence(summary), (item,))
+    return PurposeResult(
+        text=_sentence(summary),
+        source=PurposeSource.DOCSTRING,
+        supporting_evidence=(item,),
+    )
 
 
 def _identifier_tokens(value: str) -> tuple[str, ...]:
@@ -290,13 +295,18 @@ def _structural_unknown(
                 parts.append(f"{count} {singular if count == 1 else plural}")
                 support.extend(item for item in evidence if item.code == code)
         if parts:
-            return PurposeResult(f"Defines {' and '.join(parts)}.", _ordered(support))
+            return PurposeResult(
+                text=f"Defines {' and '.join(parts)}.",
+                source=PurposeSource.STRUCTURE,
+                supporting_evidence=_ordered(support),
+            )
     elif isinstance(facts, ClassFacts) and facts.method_count:
         support = tuple(item for item in evidence if item.code == "method_count")
         label = "method" if facts.method_count == 1 else "methods"
         return PurposeResult(
-            f"Defines {facts.method_count} {label}.",
-            _ordered(support),
+            text=f"Defines {facts.method_count} {label}.",
+            source=PurposeSource.STRUCTURE,
+            supporting_evidence=_ordered(support),
         )
     return PurposeResult(None)
 
@@ -323,6 +333,7 @@ def generate_purpose(
         item for item in normalized if item.category is EvidenceCategory.NAMING
     )
     return PurposeResult(
-        _sentence(text),
-        _ordered((*classification.supporting_evidence, *naming)),
+        text=_sentence(text),
+        source=PurposeSource.ROLE_TEMPLATE,
+        supporting_evidence=_ordered((*classification.supporting_evidence, *naming)),
     )
