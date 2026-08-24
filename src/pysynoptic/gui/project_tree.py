@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, TypeAlias
 
+from pysynoptic.gui.state import InsightSubjectKind
 from pysynoptic.models import CallableIdentity, ProjectAnalysis
 
 ProjectTreeNodeKind: TypeAlias = Literal[
@@ -30,6 +31,8 @@ class ProjectTreeNode:
     path: Path | None = None
     module_node_id: str | None = None
     symbol_id: str | None = None
+    insight_kind: InsightSubjectKind | None = None
+    insight_identity: str | None = None
     children: tuple[ProjectTreeNode, ...] = ()
 
 
@@ -90,6 +93,8 @@ class _MutableTreeNode:
     path: Path | None = None
     module_node_id: str | None = None
     symbol_id: str | None = None
+    insight_kind: InsightSubjectKind | None = None
+    insight_identity: str | None = None
     children: list[_MutableTreeNode] = field(default_factory=list)
 
     def freeze(self) -> ProjectTreeNode:
@@ -100,6 +105,8 @@ class _MutableTreeNode:
             path=self.path,
             module_node_id=self.module_node_id,
             symbol_id=self.symbol_id,
+            insight_kind=self.insight_kind,
+            insight_identity=self.insight_identity,
             children=tuple(child.freeze() for child in self.children),
         )
 
@@ -216,6 +223,7 @@ def build_project_tree(
     """Build the complete project/file/callable hierarchy without Tk."""
     if target_kind == "file":
         module_node_id = None
+        insight_identity = None
         if analysis is not None:
             identity = next(
                 (
@@ -226,12 +234,15 @@ def build_project_tree(
                 analysis.module_identities[0] if analysis.module_identities else None,
             )
             module_node_id = identity.path.as_posix() if identity is not None else None
+            insight_identity = identity.dotted_name if identity is not None else None
         root = _MutableTreeNode(
             key=f"file:{selected_path.as_posix()}",
             label=selected_path.name,
             kind="file",
             path=selected_path,
             module_node_id=module_node_id,
+            insight_kind="module" if insight_identity is not None else None,
+            insight_identity=insight_identity,
         )
         if analysis is not None:
             root.children.extend(_callable_groups(analysis, selected_path))
@@ -246,9 +257,11 @@ def build_project_tree(
     if analysis is None:
         return root.freeze()
 
+    module_identities = {
+        identity.path: identity for identity in analysis.module_identities
+    }
     module_ids = {
-        identity.path: identity.path.as_posix()
-        for identity in analysis.module_identities
+        path: identity.path.as_posix() for path, identity in module_identities.items()
     }
     resource_paths = {resource.path for resource in analysis.resources}
     paths = sorted(
@@ -281,6 +294,10 @@ def build_project_tree(
             kind="file" if is_python else "resource",
             path=path,
             module_node_id=module_ids.get(path),
+            insight_kind="module" if is_python else None,
+            insight_identity=(
+                module_identities[path].dotted_name if is_python else None
+            ),
         )
         if is_python:
             file_node.children.extend(_callable_groups(analysis, path))
@@ -306,6 +323,14 @@ def _callable_groups(
             ),
         )
     )
+    module_name = next(
+        (
+            identity.dotted_name
+            for identity in analysis.module_identities
+            if identity.path == path
+        ),
+        None,
+    )
     file_analysis = next(
         (item for item in analysis.file_analyses if item.path == path), None
     )
@@ -323,6 +348,10 @@ def _callable_groups(
             kind="callable",
             path=path,
             symbol_id=identity.symbol.symbol_id,
+            insight_kind="callable",
+            insight_identity=(
+                f"{identity.module.dotted_name}::{identity.symbol.qualified_name}"
+            ),
         )
         for identity in identities
     }
@@ -354,6 +383,10 @@ def _callable_groups(
                 label=class_name,
                 kind="class",
                 path=path,
+                insight_kind="class" if module_name is not None else None,
+                insight_identity=(
+                    f"{module_name}::{class_name}" if module_name is not None else None
+                ),
             )
             class_node.children.extend(methods_by_class[class_name])
             classes.children.append(class_node)

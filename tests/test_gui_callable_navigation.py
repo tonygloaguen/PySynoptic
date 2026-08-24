@@ -195,16 +195,25 @@ def test_app_synchronizes_calls_to_flow_and_back_without_tk() -> None:
         render_selected=Mock(return_value=True),
     )
     calls = SimpleNamespace(select_root=Mock(return_value=True))
+    insights = SimpleNamespace(
+        select_callable=Mock(return_value=False),
+        selection=None,
+    )
     notebook = SimpleNamespace(select=Mock())
     app = SimpleNamespace(
         flow_panel=flow,
         call_graph_panel=calls,
+        insights_panel=insights,
+        state=SimpleNamespace(),
         notebook=notebook,
         _syncing_callable_selection=False,
         _selected_callable_id=None,
         _highlight_callable_in_tree=Mock(),
     )
     app._synchronize_callable = MethodType(PySynopticApp._synchronize_callable, app)
+    app._select_callable_insight = MethodType(
+        PySynopticApp._select_callable_insight, app
+    )
 
     PySynopticApp._open_flow(app, "first-id")
     PySynopticApp._open_calls(app, "second-id")

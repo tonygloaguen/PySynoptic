@@ -16,6 +16,7 @@ from pysynoptic.gui.architecture import ArchitecturePanel
 from pysynoptic.gui.call_graph import ContextualCallGraphPanel
 from pysynoptic.gui.controller import ApplicationController
 from pysynoptic.gui.flow import FlowPanel
+from pysynoptic.gui.insights import InsightsPanel
 from pysynoptic.gui.project_tree import (
     ProjectTreeNode,
     build_project_tree,
@@ -23,10 +24,21 @@ from pysynoptic.gui.project_tree import (
 )
 from pysynoptic.gui.state import (
     ApplicationState,
+    InsightSubjectKind,
     controls_for_state,
     mark_analysis_started,
 )
 from pysynoptic.renderers import render_mermaid_export
+
+APPLICATION_TAB_ORDER = (
+    "Overview",
+    "Architecture",
+    "Calls",
+    "Flow",
+    "Insights",
+    "Dependencies",
+    "Mermaid",
+)
 
 
 class PySynopticApp(ttk.Window):
@@ -39,6 +51,7 @@ class PySynopticApp(ttk.Window):
         self._tree_graph_nodes: dict[str, str] = {}
         self._tree_callable_nodes: dict[str, str] = {}
         self._callable_tree_items: dict[str, str] = {}
+        self._tree_insight_nodes: dict[str, tuple[InsightSubjectKind, str]] = {}
         self._selected_callable_id: str | None = None
         self._rendered_analysis = None
         self._syncing_callable_selection = False
@@ -154,6 +167,7 @@ class PySynopticApp(ttk.Window):
         self._add_architecture_tab()
         self._add_call_graph_tab()
         self._add_flow_tab()
+        self._add_insights_tab()
         self.dependencies_text = self._add_text_tab("Dependencies")
         self.mermaid_text = self._add_text_tab("Mermaid", fixed_width=True)
         self.notebook.bind("<<NotebookTabChanged>>", self._notebook_changed)
@@ -179,6 +193,14 @@ class PySynopticApp(ttk.Window):
             on_callable_selected=self._callable_selected_from_flow,
         )
         self.notebook.add(self.flow_panel, text="Flow")
+
+    def _add_insights_tab(self) -> None:
+        self.insights_panel = InsightsPanel(
+            self.notebook,
+            on_show_calls=self._open_calls,
+            on_open_flow=self._open_flow,
+        )
+        self.notebook.add(self.insights_panel, text="Insights")
 
     def _add_text_tab(self, label: str, *, fixed_width: bool = False) -> ScrolledText:
         panel = ttk.Frame(self.notebook, padding=8)
@@ -328,8 +350,22 @@ class PySynopticApp(ttk.Window):
         self.architecture_panel.set_analysis(self.state.project_analysis)
         self.call_graph_panel.set_analysis(self.state.project_analysis)
         self.flow_panel.set_analysis(self.state.project_analysis)
+        self.insights_panel.set_analysis(
+            self.state.insight_analysis,
+            error_message=self.state.insight_error_message,
+        )
         if analysis_changed:
             self._selected_callable_id = self.flow_panel.selected_symbol_id
+        if (
+            self.state.selected_insight_kind is not None
+            and self.state.selected_insight_identity is not None
+        ):
+            self.insights_panel.select(
+                self.state.selected_insight_kind,
+                self.state.selected_insight_identity,
+            )
+        elif self._selected_callable_id is not None:
+            self._select_callable_insight(self._selected_callable_id)
         self._render_tree()
         self._set_text(self.overview_text, self._overview_content())
         self._set_text(self.dependencies_text, self._dependencies_content())
@@ -349,6 +385,7 @@ class PySynopticApp(ttk.Window):
         self._tree_graph_nodes.clear()
         self._tree_callable_nodes.clear()
         self._callable_tree_items.clear()
+        self._tree_insight_nodes.clear()
         self.project_tree.delete(*self.project_tree.get_children())
         selected_path = self.state.selected_path
         if selected_path is None:
@@ -393,6 +430,11 @@ class PySynopticApp(ttk.Window):
         if node.symbol_id is not None:
             self._tree_callable_nodes[item] = node.symbol_id
             self._callable_tree_items[node.symbol_id] = item
+        if node.insight_kind is not None and node.insight_identity is not None:
+            self._tree_insight_nodes[item] = (
+                node.insight_kind,
+                node.insight_identity,
+            )
         for child in node.children:
             self._insert_tree_node(
                 item,
@@ -420,6 +462,11 @@ class PySynopticApp(ttk.Window):
                 render_flow=current_tab == "Flow",
             )
             return
+        insight_selection = self._tree_insight_nodes.get(item)
+        if insight_selection is not None:
+            kind, identity = insight_selection
+            if self._select_insight(kind, identity) and kind == "class":
+                self.notebook.select(self.insights_panel)
         node_id = self._tree_graph_nodes.get(item)
         if node_id is None:
             return
@@ -459,6 +506,7 @@ class PySynopticApp(ttk.Window):
                 render_flow=render_flow,
             )
             self._selected_callable_id = symbol_id
+            self._select_callable_insight(symbol_id)
             if plan.update_calls:
                 self.call_graph_panel.select_root(symbol_id, notify=False)
             if plan.update_flow:
@@ -472,6 +520,28 @@ class PySynopticApp(ttk.Window):
             self._highlight_callable_in_tree()
         finally:
             self._syncing_callable_selection = False
+
+    def _select_callable_insight(self, symbol_id: str) -> bool:
+        if not self.insights_panel.select_callable(symbol_id):
+            return False
+        selection = self.insights_panel.selection
+        if selection is not None:
+            self.state = replace(
+                self.state,
+                selected_insight_kind=selection.kind,
+                selected_insight_identity=selection.identity,
+            )
+        return True
+
+    def _select_insight(self, kind: InsightSubjectKind, identity: str) -> bool:
+        if not self.insights_panel.select(kind, identity):
+            return False
+        self.state = replace(
+            self.state,
+            selected_insight_kind=kind,
+            selected_insight_identity=identity,
+        )
+        return True
 
     def _highlight_callable_in_tree(self) -> None:
         if self._selected_callable_id is None:
