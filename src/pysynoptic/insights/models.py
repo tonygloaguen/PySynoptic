@@ -232,6 +232,14 @@ class RoleClassification:
 
 
 @dataclass(frozen=True, slots=True)
+class PurposeResult:
+    """One short deterministic purpose and the Evidence supporting it."""
+
+    text: str | None
+    supporting_evidence: tuple[InsightEvidence, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class ModuleInsight:
     """Future classified presentation for a module; not produced yet."""
 
