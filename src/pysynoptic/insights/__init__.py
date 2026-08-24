@@ -21,10 +21,12 @@ from pysynoptic.insights.models import (
     ModuleFacts,
     ModuleInsight,
     ParameterFacts,
+    PurposeResult,
     RoleClassification,
     RoleSupport,
     StaticOperation,
 )
+from pysynoptic.insights.purpose import generate_purpose
 
 __all__ = [
     "CallableFacts",
@@ -39,6 +41,7 @@ __all__ = [
     "ModuleFacts",
     "ModuleInsight",
     "ParameterFacts",
+    "PurposeResult",
     "RoleClassification",
     "RoleSupport",
     "StaticOperation",
@@ -49,4 +52,5 @@ __all__ = [
     "generate_class_evidence",
     "generate_evidence",
     "generate_module_evidence",
+    "generate_purpose",
 ]
