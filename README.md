@@ -85,8 +85,8 @@ references remain visible as diagnostics rather than speculative links.
 Flow explains the structure inside one callable. It represents `if`/`else`,
 `for`/`while`, `try`/`except`/`finally`, `break`, `continue`, `raise`, `return`,
 and call steps. Labeled transitions distinguish branches, loop backs, exception
-paths, and exits. This view of `_add_argument_bindings()` exposes two loops and
-a conditional without expanding the rest of the project.
+paths, and exits. This view of `analyze_project()` connects its selected tree
+entry and call context to the loop and exception path inside the function.
 
 ## Standalone Python files
 
