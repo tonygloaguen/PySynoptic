@@ -14,6 +14,7 @@ from pysynoptic.graph import (
     build_function_flow_graph,
     layout_vertical_graph,
 )
+from pysynoptic.gui.flow_explanations import FlowExplanationCache
 from pysynoptic.gui.graph_canvas import DependencyGraphCanvas
 from pysynoptic.gui.graph_helpers import default_flow_callable, search_flow_callables
 from pysynoptic.gui.project_tree import (
@@ -39,7 +40,9 @@ class FlowPanel(ttk.Frame):
         master: Any,
         *,
         on_show_calls: Callable[[str], None] | None = None,
+        on_show_insights: Callable[[str], None] | None = None,
         on_callable_selected: Callable[[str], None] | None = None,
+        flow_explanations: FlowExplanationCache | None = None,
     ) -> None:
         super().__init__(master)
         self._analysis: ProjectAnalysis | None = None
@@ -51,7 +54,9 @@ class FlowPanel(ttk.Frame):
         self._current_graph: DependencyGraph | None = None
         self._options: tuple[CallableOption, ...] = ()
         self._on_show_calls = on_show_calls
+        self._on_show_insights = on_show_insights
         self._on_callable_selected = on_callable_selected
+        self._flow_explanations = flow_explanations
         self._relation_links: dict[str, str] = {}
 
         controls = ttk.Frame(self)
@@ -101,6 +106,13 @@ class FlowPanel(ttk.Frame):
             state="disabled",
         )
         self.show_calls_button.pack(fill="x", pady=(5, 0))
+        self.show_insights_button = ttk.Button(
+            relation_panel,
+            text="Show in Insights",
+            command=self._show_in_insights,
+            state="disabled",
+        )
+        self.show_insights_button.pack(fill="x", pady=(5, 0))
 
         body = ttk.Panedwindow(self, orient="horizontal")
         body.pack(fill="both", expand=True)
@@ -153,6 +165,7 @@ class FlowPanel(ttk.Frame):
         self.relation_tree.delete(*self.relation_tree.get_children())
         self._relation_links.clear()
         self.show_calls_button.configure(state="disabled")
+        self.show_insights_button.configure(state="disabled")
         self.details_variable.set(
             f"{len(self._identities)} callables available. Select one to build flow."
             if self._identities
@@ -227,7 +240,16 @@ class FlowPanel(ttk.Frame):
         ):
             return True
         try:
-            flow = analyze_callable_flow(identity.module.path, identity.symbol)
+            if self._flow_explanations is not None:
+                cached = self._flow_explanations.get(symbol_id)
+                if cached is None:
+                    self.details_variable.set(
+                        "Flow result was discarded because the analysis changed."
+                    )
+                    return False
+                flow = cached.flow
+            else:
+                flow = analyze_callable_flow(identity.module.path, identity.symbol)
         except (OSError, SyntaxError, ValueError) as error:
             self.canvas.clear()
             self.details_variable.set(f"Flow analysis failed: {error}")
@@ -253,6 +275,15 @@ class FlowPanel(ttk.Frame):
     def current_graph(self) -> DependencyGraph | None:
         """Return the current logical CFG for Mermaid export."""
         return self._current_graph
+
+    def highlight_node_ids(self, node_ids: tuple[str, ...]) -> tuple[str, ...]:
+        """Highlight Flow nodes supplied by one explanation step."""
+        if self.current_flow is None:
+            return ()
+        highlighted = self.canvas.highlight_node_ids(node_ids)
+        if highlighted:
+            self._show_flow_node(self._nodes[highlighted[0]])
+        return highlighted
 
     def _render_callable_header(self, identity: CallableIdentity) -> None:
         self.header_title_variable.set(f"Flow of: {callable_short_label(identity)}")
@@ -304,6 +335,9 @@ class FlowPanel(ttk.Frame):
         self.show_calls_button.configure(
             state="normal" if self._on_show_calls is not None else "disabled"
         )
+        self.show_insights_button.configure(
+            state="normal" if self._on_show_insights is not None else "disabled"
+        )
 
     def _activate_relation(self, _event: object) -> None:
         selected = self.relation_tree.selection()
@@ -313,6 +347,10 @@ class FlowPanel(ttk.Frame):
     def _show_in_calls(self) -> None:
         if self._selected is not None and self._on_show_calls is not None:
             self._on_show_calls(self._selected.symbol.symbol_id)
+
+    def _show_in_insights(self) -> None:
+        if self._selected is not None and self._on_show_insights is not None:
+            self._on_show_insights(self._selected.symbol.symbol_id)
 
     def _show_node(self, node: GraphNode) -> None:
         flow_node = self._nodes.get(node.node_id)

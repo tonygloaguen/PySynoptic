@@ -45,6 +45,7 @@ class DependencyGraphCanvas(ttk.Frame):
         self._nodes: dict[str, PositionedNode] = {}
         self._node_items: dict[int, str] = {}
         self._selected_id: str | None = None
+        self._highlighted_ids: set[str] = set()
         self._scale = 1.0
         self._offset_x = 0.0
         self._offset_y = 0.0
@@ -125,6 +126,7 @@ class DependencyGraphCanvas(ttk.Frame):
         self._layout = layout
         self._nodes = {item.node.node_id: item for item in layout.nodes}
         self._selected_id = None
+        self._highlighted_ids.clear()
         self._fit_pending = True
         self._update_status()
         self.after_idle(self.fit)
@@ -134,6 +136,7 @@ class DependencyGraphCanvas(ttk.Frame):
         self._layout = None
         self._nodes.clear()
         self._selected_id = None
+        self._highlighted_ids.clear()
         self._scale = 1.0
         self._offset_x = 0.0
         self._offset_y = 0.0
@@ -174,6 +177,7 @@ class DependencyGraphCanvas(ttk.Frame):
         if node_id not in self._nodes:
             return False
         self._selected_id = node_id
+        self._highlighted_ids.clear()
         if center:
             self._center_node(node_id)
         self._draw()
@@ -182,11 +186,27 @@ class DependencyGraphCanvas(ttk.Frame):
 
     def clear_selection(self) -> None:
         """Clear all node and neighborhood highlighting."""
-        if self._selected_id is None:
+        if self._selected_id is None and not self._highlighted_ids:
             return
         self._selected_id = None
+        self._highlighted_ids.clear()
         self._draw()
         self._update_status()
+
+    def highlight_node_ids(self, node_ids: tuple[str, ...]) -> tuple[str, ...]:
+        """Highlight every existing requested node without changing pan or zoom."""
+        valid_ids: list[str] = []
+        for node_id in node_ids:
+            if node_id in self._nodes and node_id not in valid_ids:
+                valid_ids.append(node_id)
+        valid = tuple(valid_ids)
+        if not valid:
+            return ()
+        self._highlighted_ids = set(valid)
+        self._selected_id = valid[0]
+        self._draw()
+        self._update_status()
+        return valid
 
     def activate_node(self, node_id: str) -> bool:
         """Select and activate a node through the double-click callback."""
@@ -200,6 +220,8 @@ class DependencyGraphCanvas(ttk.Frame):
         layout = self._layout
         if layout is None:
             message = "No graph"
+        elif len(self._highlighted_ids) > 1:
+            message = f"{len(self._highlighted_ids)} nodes highlighted"
         elif self._selected_id:
             message = self._nodes[self._selected_id].node.label
         else:
@@ -292,6 +314,13 @@ class DependencyGraphCanvas(ttk.Frame):
     def _highlight_sets(self) -> tuple[set[str], set[tuple[str, str]]]:
         if self._layout is None or self._selected_id is None:
             return set(), set()
+        if self._highlighted_ids:
+            return self._highlighted_ids, {
+                (edge.source_id, edge.target_id)
+                for edge in self._layout.edges
+                if edge.source_id in self._highlighted_ids
+                and edge.target_id in self._highlighted_ids
+            }
         neighbors = {self._selected_id}
         edges: set[tuple[str, str]] = set()
         for edge in self._layout.edges:
