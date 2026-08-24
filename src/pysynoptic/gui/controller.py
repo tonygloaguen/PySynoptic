@@ -7,6 +7,8 @@ from pathlib import Path
 
 from pysynoptic.analyzer import analyze_project, analyze_python_file_context
 from pysynoptic.gui.state import ApplicationState
+from pysynoptic.insights import InsightAnalysis, analyze_insights
+from pysynoptic.models import ProjectAnalysis
 from pysynoptic.renderers import render_mermaid, write_mermaid
 
 
@@ -54,6 +56,7 @@ class ApplicationController:
             if state.target_kind == "file":
                 project_analysis = analyze_python_file_context(state.selected_path)
                 analysis = project_analysis.file_analyses[0]
+                insights, insight_error = self._analyze_insights(project_analysis)
                 has_syntax_error = analysis.syntax_error is not None
                 status = (
                     "File analysis completed with a syntax error."
@@ -64,6 +67,10 @@ class ApplicationController:
                     state,
                     file_analysis=analysis,
                     project_analysis=project_analysis,
+                    insight_analysis=insights,
+                    selected_insight_kind=None,
+                    selected_insight_identity=None,
+                    insight_error_message=insight_error,
                     mermaid_source=render_mermaid(project_analysis),
                     is_analyzing=False,
                     status_message=status,
@@ -71,6 +78,7 @@ class ApplicationController:
                 )
 
             analysis = analyze_project(state.selected_path)
+            insights, insight_error = self._analyze_insights(analysis)
             syntax_error_count = sum(
                 item.syntax_error is not None for item in analysis.file_analyses
             )
@@ -84,6 +92,10 @@ class ApplicationController:
                 state,
                 file_analysis=None,
                 project_analysis=analysis,
+                insight_analysis=insights,
+                selected_insight_kind=None,
+                selected_insight_identity=None,
+                insight_error_message=insight_error,
                 mermaid_source=render_mermaid(analysis),
                 is_analyzing=False,
                 status_message=status,
@@ -97,6 +109,15 @@ class ApplicationController:
                 status_message=message,
                 error_message=message,
             )
+
+    @staticmethod
+    def _analyze_insights(
+        analysis: ProjectAnalysis,
+    ) -> tuple[InsightAnalysis | None, str | None]:
+        try:
+            return analyze_insights(analysis), None
+        except (OSError, ValueError) as error:
+            return None, f"Insights unavailable: {error}"
 
     def export_mermaid(self, state: ApplicationState, output_path: Path) -> Path:
         """Export the current project graph or raise a clear usage error."""

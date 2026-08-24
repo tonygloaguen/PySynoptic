@@ -6,9 +6,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, TypeAlias
 
+from pysynoptic.insights import InsightAnalysis
 from pysynoptic.models import FileAnalysis, ProjectAnalysis
 
 TargetKind: TypeAlias = Literal["file", "project"]
+InsightSubjectKind: TypeAlias = Literal["module", "class", "callable"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +21,10 @@ class ApplicationState:
     target_kind: TargetKind | None = None
     file_analysis: FileAnalysis | None = None
     project_analysis: ProjectAnalysis | None = None
+    insight_analysis: InsightAnalysis | None = None
+    selected_insight_kind: InsightSubjectKind | None = None
+    selected_insight_identity: str | None = None
+    insight_error_message: str | None = None
     mermaid_source: str = ""
     status_message: str = "Choose a Python file or project to begin."
     error_message: str | None = None
