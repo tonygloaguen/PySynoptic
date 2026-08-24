@@ -18,7 +18,7 @@ ProjectTreeNodeKind: TypeAlias = Literal[
     "class",
     "callable",
 ]
-CallableSelectionSource: TypeAlias = Literal["tree", "calls", "flow"]
+CallableSelectionSource: TypeAlias = Literal["tree", "calls", "flow", "insights"]
 
 
 @dataclass(frozen=True, slots=True)

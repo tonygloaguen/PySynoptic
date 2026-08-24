@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from tkinter.scrolledtext import ScrolledText
 from typing import TypeAlias
 
 import ttkbootstrap as ttk
 
+from pysynoptic.gui.flow_explanations import FlowExplanationCache
 from pysynoptic.gui.state import InsightSubjectKind
 from pysynoptic.insights import (
     CallableInsight,
     ClassInsight,
+    FlowExplanation,
+    FlowExplanationReliability,
+    FlowStep,
     InsightAnalysis,
     InsightConfidence,
     InsightEvidence,
@@ -66,6 +71,17 @@ class InsightPresentation:
     sections: tuple[InsightSection, ...]
     evidence: tuple[InsightEvidence, ...]
     callable_symbol_id: str | None = None
+    flow_explanation: FlowExplanation | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FlowStepPresentation:
+    """One root or nested Key Step rendered without flattening its hierarchy."""
+
+    marker: str
+    text: str
+    depth: int
+    source_node_ids: tuple[str, ...]
 
 
 class InsightCatalog:
@@ -187,6 +203,7 @@ def _callable_sections(insight: CallableInsight) -> tuple[InsightSection, ...]:
 def present_insight(
     selection: InsightSelection,
     insight: InsightSubject,
+    flow_explanation: FlowExplanation | None = None,
 ) -> InsightPresentation:
     """Build a display-only representation without changing engine text."""
     if isinstance(insight, CallableInsight):
@@ -214,7 +231,37 @@ def present_insight(
         sections=sections,
         evidence=insight.evidence,
         callable_symbol_id=symbol_id,
+        flow_explanation=flow_explanation if symbol_id is not None else None,
     )
+
+
+def flow_step_presentations(
+    steps: tuple[FlowStep, ...],
+) -> tuple[FlowStepPresentation, ...]:
+    """Preserve root order and child hierarchy for the Insights text view."""
+    rows: list[FlowStepPresentation] = []
+
+    def append(children: tuple[FlowStep, ...], depth: int) -> None:
+        for index, step in enumerate(children, start=1):
+            rows.append(
+                FlowStepPresentation(
+                    marker=f"{index}." if depth == 0 else "•",
+                    text=step.text,
+                    depth=depth,
+                    source_node_ids=step.source_node_ids,
+                )
+            )
+            append(step.child_steps, depth + 1)
+
+    append(steps, 0)
+    return tuple(rows)
+
+
+def flow_summary_text(explanation: FlowExplanation | None) -> str:
+    """Return exact engine text or the single approved UNKNOWN fallback."""
+    if explanation is None or explanation.summary is None:
+        return "No reliable flow explanation available."
+    return explanation.summary
 
 
 def evidence_lines(evidence: tuple[InsightEvidence, ...]) -> tuple[str, ...]:
@@ -240,6 +287,8 @@ class InsightsPanel(ttk.Frame):
         *,
         on_show_calls=None,
         on_open_flow=None,
+        on_open_flow_step: Callable[[str, tuple[str, ...]], None] | None = None,
+        flow_explanations: FlowExplanationCache | None = None,
     ) -> None:
         super().__init__(master, padding=10)
         self._catalog = InsightCatalog(None)
@@ -250,6 +299,10 @@ class InsightsPanel(ttk.Frame):
         self._evidence_expanded = False
         self._on_show_calls = on_show_calls
         self._on_open_flow = on_open_flow
+        self._on_open_flow_step = on_open_flow_step
+        self._flow_explanations = flow_explanations
+        self._flow_step_links: dict[str, tuple[str, ...]] = {}
+        self._selected_step_node_ids: tuple[str, ...] | None = None
 
         actions = ttk.Frame(self)
         actions.pack(fill="x", pady=(0, 8))
@@ -281,6 +334,7 @@ class InsightsPanel(ttk.Frame):
         self.summary.pack(fill="both", expand=True)
         self.summary.tag_configure("title", font=("TkDefaultFont", 15, "bold"))
         self.summary.tag_configure("heading", font=("TkDefaultFont", 10, "bold"))
+        self.summary.tag_configure("step-link", foreground="#0d6efd", underline=True)
         self.summary.configure(state="disabled")
 
         evidence_header = ttk.Frame(self)
@@ -312,6 +366,11 @@ class InsightsPanel(ttk.Frame):
     def selected_callable_symbol_id(self) -> str | None:
         return self._presentation.callable_symbol_id if self._presentation else None
 
+    @property
+    def flow_explanation(self) -> FlowExplanation | None:
+        """Return the explanation currently presented for a callable."""
+        return self._presentation.flow_explanation if self._presentation else None
+
     def set_analysis(
         self,
         analysis: InsightAnalysis | None,
@@ -327,6 +386,8 @@ class InsightsPanel(ttk.Frame):
         self._selection = None
         self._presentation = None
         self._evidence_expanded = False
+        self._flow_step_links.clear()
+        self._selected_step_node_ids = None
         self.evidence_text.pack_forget()
         self._render_empty()
 
@@ -336,8 +397,19 @@ class InsightsPanel(ttk.Frame):
         insight = self._catalog.find(selection)
         if insight is None:
             return False
+        previous_symbol_id = self.selected_callable_symbol_id
+        flow_explanation = None
+        if isinstance(insight, CallableInsight) and self._flow_explanations is not None:
+            try:
+                cached = self._flow_explanations.get(insight.symbol_id)
+            except (OSError, SyntaxError, ValueError):
+                cached = None
+            if cached is not None:
+                flow_explanation = cached.explanation
+        if previous_symbol_id != getattr(insight, "symbol_id", None):
+            self._selected_step_node_ids = None
         self._selection = selection
-        self._presentation = present_insight(selection, insight)
+        self._presentation = present_insight(selection, insight, flow_explanation)
         self._render_presentation()
         return True
 
@@ -366,14 +438,35 @@ class InsightsPanel(ttk.Frame):
             return
         self.summary.configure(state="normal")
         self.summary.delete("1.0", "end")
+        self._flow_step_links.clear()
         self.summary.insert("end", f"{presentation.title}\n", "title")
         self.summary.insert("end", f"{presentation.subject_type}\n\n")
         self._summary_field("Role", presentation.role)
         self._summary_field(
-            "Confidence",
+            (
+                "Insight confidence"
+                if presentation.callable_symbol_id is not None
+                else "Confidence"
+            ),
             f"{presentation.confidence}\n{presentation.confidence_description}",
         )
         self._summary_field("Purpose", presentation.purpose)
+        if presentation.callable_symbol_id is not None:
+            explanation = presentation.flow_explanation
+            self._summary_field(
+                "How it works",
+                flow_summary_text(explanation),
+            )
+            if explanation is not None:
+                self._summary_field(
+                    "Flow explanation reliability",
+                    explanation.reliability.value.upper(),
+                )
+                if (
+                    explanation.reliability is not FlowExplanationReliability.UNKNOWN
+                    and explanation.steps
+                ):
+                    self._render_key_steps(explanation.steps)
         self._summary_field("Purpose source", presentation.purpose_source)
         for section in presentation.sections:
             self.summary.insert("end", f"{section.title}\n", "heading")
@@ -391,6 +484,21 @@ class InsightsPanel(ttk.Frame):
         self.calls_button.configure(state=callable_state)
         self.flow_button.configure(state=callable_state)
         self._render_evidence()
+
+    def _render_key_steps(self, steps: tuple[FlowStep, ...]) -> None:
+        self.summary.insert("end", "Key steps\n", "heading")
+        for index, row in enumerate(flow_step_presentations(steps)):
+            tag = f"flow-step-{index}"
+            self._flow_step_links[tag] = row.source_node_ids
+            prefix = f"{'   ' * row.depth}{row.marker} "
+            self.summary.insert("end", prefix)
+            self.summary.insert("end", f"{row.text}\n", ("step-link", tag))
+            self.summary.tag_bind(
+                tag,
+                "<Button-1>",
+                lambda _event, step_tag=tag: self._open_flow_step(step_tag),
+            )
+        self.summary.insert("end", "\n")
 
     def _summary_field(self, label: str, value: str) -> None:
         self.summary.insert("end", f"{label}\n", "heading")
@@ -429,3 +537,10 @@ class InsightsPanel(ttk.Frame):
         symbol_id = self.selected_callable_symbol_id
         if symbol_id is not None and self._on_open_flow is not None:
             self._on_open_flow(symbol_id)
+
+    def _open_flow_step(self, tag: str) -> None:
+        symbol_id = self.selected_callable_symbol_id
+        node_ids = self._flow_step_links.get(tag)
+        if symbol_id is not None and node_ids and self._on_open_flow_step is not None:
+            self._selected_step_node_ids = node_ids
+            self._on_open_flow_step(symbol_id, node_ids)

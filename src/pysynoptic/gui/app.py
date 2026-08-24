@@ -16,6 +16,7 @@ from pysynoptic.gui.architecture import ArchitecturePanel
 from pysynoptic.gui.call_graph import ContextualCallGraphPanel
 from pysynoptic.gui.controller import ApplicationController
 from pysynoptic.gui.flow import FlowPanel
+from pysynoptic.gui.flow_explanations import FlowExplanationCache
 from pysynoptic.gui.insights import InsightsPanel
 from pysynoptic.gui.project_tree import (
     ProjectTreeNode,
@@ -58,6 +59,7 @@ class PySynopticApp(ttk.Window):
         self._syncing_tree_selection = False
         self._pending_tree_selection: str | None = None
         self._analysis_runner = AnalysisRunner(self.controller.analyze)
+        self._flow_explanations = FlowExplanationCache()
         self._analysis_poll_id: str | None = None
         self._active_mermaid_mode = "architecture"
 
@@ -190,7 +192,9 @@ class PySynopticApp(ttk.Window):
         self.flow_panel = FlowPanel(
             self.notebook,
             on_show_calls=self._open_calls,
+            on_show_insights=self._open_insights,
             on_callable_selected=self._callable_selected_from_flow,
+            flow_explanations=self._flow_explanations,
         )
         self.notebook.add(self.flow_panel, text="Flow")
 
@@ -199,6 +203,8 @@ class PySynopticApp(ttk.Window):
             self.notebook,
             on_show_calls=self._open_calls,
             on_open_flow=self._open_flow,
+            on_open_flow_step=self._open_flow_step,
+            flow_explanations=self._flow_explanations,
         )
         self.notebook.add(self.insights_panel, text="Insights")
 
@@ -347,6 +353,10 @@ class PySynopticApp(ttk.Window):
         if analysis_changed:
             self._selected_callable_id = None
             self._rendered_analysis = self.state.project_analysis
+            self._flow_explanations.set_analysis(
+                self.state.project_analysis,
+                self.state.insight_analysis,
+            )
         self.architecture_panel.set_analysis(self.state.project_analysis)
         self.call_graph_panel.set_analysis(self.state.project_analysis)
         self.flow_panel.set_analysis(self.state.project_analysis)
@@ -482,6 +492,22 @@ class PySynopticApp(ttk.Window):
         if self.call_graph_panel.select_root(symbol_id, notify=False):
             self._synchronize_callable(symbol_id, source="calls", render_flow=False)
             self.notebook.select(self.call_graph_panel)
+
+    def _open_insights(self, symbol_id: str) -> None:
+        self._synchronize_callable(symbol_id, source="flow", render_flow=False)
+        if self.insights_panel.selected_callable_symbol_id == symbol_id:
+            self.notebook.select(self.insights_panel)
+
+    def _open_flow_step(
+        self,
+        symbol_id: str,
+        node_ids: tuple[str, ...],
+    ) -> None:
+        self._synchronize_callable(symbol_id, source="insights", render_flow=True)
+        if self.flow_panel.selected_symbol_id != symbol_id:
+            return
+        self.notebook.select(self.flow_panel)
+        self.flow_panel.highlight_node_ids(node_ids)
 
     def _callable_selected_from_calls(self, symbol_id: str) -> None:
         self._synchronize_callable(symbol_id, source="calls", render_flow=False)
