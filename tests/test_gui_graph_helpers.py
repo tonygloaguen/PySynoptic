@@ -39,6 +39,9 @@ def test_flow_selector_prefers_main_for_single_file(tmp_path: Path) -> None:
     assert [item.symbol.name for item in search_flow_callables(analysis, "FIRST")] == [
         "first"
     ]
+    assert [item.symbol.name for item in search_flow_callables(analysis, "main()")] == [
+        "main"
+    ]
 
 
 def test_flow_selector_falls_back_to_first_top_level_not_method(

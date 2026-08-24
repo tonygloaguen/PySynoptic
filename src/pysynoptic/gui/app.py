@@ -16,6 +16,11 @@ from pysynoptic.gui.architecture import ArchitecturePanel
 from pysynoptic.gui.call_graph import ContextualCallGraphPanel
 from pysynoptic.gui.controller import ApplicationController
 from pysynoptic.gui.flow import FlowPanel
+from pysynoptic.gui.project_tree import (
+    ProjectTreeNode,
+    build_project_tree,
+    plan_callable_navigation,
+)
 from pysynoptic.gui.state import (
     ApplicationState,
     controls_for_state,
@@ -32,6 +37,13 @@ class PySynopticApp(ttk.Window):
         self.controller = controller or ApplicationController()
         self.state = ApplicationState()
         self._tree_graph_nodes: dict[str, str] = {}
+        self._tree_callable_nodes: dict[str, str] = {}
+        self._callable_tree_items: dict[str, str] = {}
+        self._selected_callable_id: str | None = None
+        self._rendered_analysis = None
+        self._syncing_callable_selection = False
+        self._syncing_tree_selection = False
+        self._pending_tree_selection: str | None = None
         self._analysis_runner = AnalysisRunner(self.controller.analyze)
         self._analysis_poll_id: str | None = None
         self._active_mermaid_mode = "architecture"
@@ -154,12 +166,18 @@ class PySynopticApp(ttk.Window):
 
     def _add_call_graph_tab(self) -> None:
         self.call_graph_panel = ContextualCallGraphPanel(
-            self.notebook, on_open_flow=self._open_flow
+            self.notebook,
+            on_open_flow=self._open_flow,
+            on_callable_selected=self._callable_selected_from_calls,
         )
         self.notebook.add(self.call_graph_panel, text="Calls")
 
     def _add_flow_tab(self) -> None:
-        self.flow_panel = FlowPanel(self.notebook)
+        self.flow_panel = FlowPanel(
+            self.notebook,
+            on_show_calls=self._open_calls,
+            on_callable_selected=self._callable_selected_from_flow,
+        )
         self.notebook.add(self.flow_panel, text="Flow")
 
     def _add_text_tab(self, label: str, *, fixed_width: bool = False) -> ScrolledText:
@@ -303,10 +321,16 @@ class PySynopticApp(ttk.Window):
         explore_state = "normal" if self.state.project_analysis else "disabled"
         self.explore_calls_button.configure(state=explore_state)
         self.explore_flow_button.configure(state=explore_state)
-        self._render_tree()
+        analysis_changed = self.state.project_analysis is not self._rendered_analysis
+        if analysis_changed:
+            self._selected_callable_id = None
+            self._rendered_analysis = self.state.project_analysis
         self.architecture_panel.set_analysis(self.state.project_analysis)
         self.call_graph_panel.set_analysis(self.state.project_analysis)
         self.flow_panel.set_analysis(self.state.project_analysis)
+        if analysis_changed:
+            self._selected_callable_id = self.flow_panel.selected_symbol_id
+        self._render_tree()
         self._set_text(self.overview_text, self._overview_content())
         self._set_text(self.dependencies_text, self._dependencies_content())
         self._set_text(
@@ -323,70 +347,151 @@ class PySynopticApp(ttk.Window):
 
     def _render_tree(self) -> None:
         self._tree_graph_nodes.clear()
+        self._tree_callable_nodes.clear()
+        self._callable_tree_items.clear()
         self.project_tree.delete(*self.project_tree.get_children())
         selected_path = self.state.selected_path
         if selected_path is None:
             self.project_tree.insert("", "end", text="No selection")
             return
 
-        if self.state.target_kind == "file":
-            item = self.project_tree.insert("", "end", text=selected_path.name)
-            analysis = self.state.project_analysis
-            if analysis and analysis.module_identities:
-                self._tree_graph_nodes[item] = analysis.module_identities[
-                    0
-                ].path.as_posix()
+        target_kind = self.state.target_kind
+        if target_kind not in {"file", "project"}:
             return
-
-        root_id = self.project_tree.insert(
-            "",
-            "end",
-            text=selected_path.name or str(selected_path),
-            open=True,
+        root = build_project_tree(
+            selected_path,
+            target_kind,
+            self.state.project_analysis,
         )
-        analysis = self.state.project_analysis
-        if analysis is None:
-            return
+        self._insert_tree_node(
+            "",
+            root,
+            expand_callables=target_kind == "file",
+            is_root=True,
+        )
+        self._highlight_callable_in_tree()
 
-        module_paths = {
-            identity.path: identity.path.as_posix()
-            for identity in analysis.module_identities
-        }
-        paths = list(analysis.python_files)
-        paths.extend(resource.path for resource in analysis.resources)
-        tree_items: dict[tuple[str, ...], str] = {(): root_id}
-        for path in sorted(paths, key=lambda item: item.as_posix().casefold()):
-            try:
-                relative_path = path.relative_to(analysis.root_path)
-            except ValueError:
-                relative_path = path
-            parent_key: tuple[str, ...] = ()
-            for part in relative_path.parts:
-                key = (*parent_key, part)
-                if key not in tree_items:
-                    tree_items[key] = self.project_tree.insert(
-                        tree_items[parent_key],
-                        "end",
-                        text=part,
-                    )
-                parent_key = key
-            node_id = module_paths.get(path)
-            if node_id is not None:
-                self._tree_graph_nodes[tree_items[parent_key]] = node_id
+    def _insert_tree_node(
+        self,
+        parent: str,
+        node: ProjectTreeNode,
+        *,
+        expand_callables: bool,
+        is_root: bool = False,
+    ) -> str:
+        open_node = is_root or (
+            expand_callables and node.kind in {"file", "group", "class", "callable"}
+        )
+        item = self.project_tree.insert(
+            parent,
+            "end",
+            text=node.label,
+            open=open_node,
+        )
+        if node.module_node_id is not None:
+            self._tree_graph_nodes[item] = node.module_node_id
+        if node.symbol_id is not None:
+            self._tree_callable_nodes[item] = node.symbol_id
+            self._callable_tree_items[node.symbol_id] = item
+        for child in node.children:
+            self._insert_tree_node(
+                item,
+                child,
+                expand_callables=expand_callables,
+            )
+        return item
 
     def _navigate_tree_to_graph(self, _event: object) -> None:
+        if self._syncing_tree_selection:
+            return
         selected = self.project_tree.selection()
         if not selected:
             return
-        node_id = self._tree_graph_nodes.get(selected[0])
+        item = selected[0]
+        if item == self._pending_tree_selection:
+            self._pending_tree_selection = None
+            return
+        symbol_id = self._tree_callable_nodes.get(item)
+        if symbol_id is not None:
+            current_tab = self.notebook.tab(self.notebook.select(), "text")
+            self._synchronize_callable(
+                symbol_id,
+                source="tree",
+                render_flow=current_tab == "Flow",
+            )
+            return
+        node_id = self._tree_graph_nodes.get(item)
         if node_id is None:
             return
         if self.architecture_panel.select_root(node_id):
             self.notebook.select(self.architecture_panel)
 
     def _open_flow(self, symbol_id: str) -> None:
-        if self.flow_panel.select_callable(symbol_id):
+        if self.flow_panel.select_callable(symbol_id, notify=False):
+            self._synchronize_callable(symbol_id, source="flow", render_flow=True)
             self.notebook.select(self.flow_panel)
+
+    def _open_calls(self, symbol_id: str) -> None:
+        if self.call_graph_panel.select_root(symbol_id, notify=False):
+            self._synchronize_callable(symbol_id, source="calls", render_flow=False)
+            self.notebook.select(self.call_graph_panel)
+
+    def _callable_selected_from_calls(self, symbol_id: str) -> None:
+        self._synchronize_callable(symbol_id, source="calls", render_flow=False)
+
+    def _callable_selected_from_flow(self, symbol_id: str) -> None:
+        self._synchronize_callable(symbol_id, source="flow", render_flow=True)
+
+    def _synchronize_callable(
+        self,
+        symbol_id: str,
+        *,
+        source: str,
+        render_flow: bool,
+    ) -> None:
+        if self._syncing_callable_selection:
+            return
+        self._syncing_callable_selection = True
+        try:
+            plan = plan_callable_navigation(
+                symbol_id,
+                source=source,
+                render_flow=render_flow,
+            )
+            self._selected_callable_id = symbol_id
+            if plan.update_calls:
+                self.call_graph_panel.select_root(symbol_id, notify=False)
+            if plan.update_flow:
+                self.flow_panel.select_callable(
+                    symbol_id,
+                    render=plan.render_flow,
+                    notify=False,
+                )
+            elif plan.render_flow:
+                self.flow_panel.render_selected()
+            self._highlight_callable_in_tree()
+        finally:
+            self._syncing_callable_selection = False
+
+    def _highlight_callable_in_tree(self) -> None:
+        if self._selected_callable_id is None:
+            return
+        item = self._callable_tree_items.get(self._selected_callable_id)
+        if item is None:
+            return
+        parent = self.project_tree.parent(item)
+        while parent:
+            self.project_tree.item(parent, open=True)
+            parent = self.project_tree.parent(parent)
+        self._syncing_tree_selection = True
+        try:
+            if self.project_tree.selection() != (item,):
+                self._pending_tree_selection = item
+                self.project_tree.selection_set(item)
+                self.project_tree.focus(item)
+            self.project_tree.see(item)
+        finally:
+            self._syncing_tree_selection = False
 
     def _mermaid_for_mode(self, mode: str) -> str | None:
         analysis = self.state.project_analysis
@@ -411,6 +516,8 @@ class PySynopticApp(ttk.Window):
         modes = {"Architecture": "architecture", "Calls": "calls", "Flow": "flow"}
         if tab_name in modes:
             self._active_mermaid_mode = modes[tab_name]
+            if tab_name == "Flow":
+                self.flow_panel.render_selected()
             return
         if tab_name == "Mermaid" and self.state.project_analysis is not None:
             source = self._mermaid_for_mode(self._active_mermaid_mode)
