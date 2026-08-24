@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal, TypeAlias
 
@@ -23,6 +24,33 @@ OperationCategory: TypeAlias = Literal[
     "process",
 ]
 InsightConfidence: TypeAlias = Literal["high", "medium", "unknown"]
+
+
+class EvidenceCategory(StrEnum):
+    """Stable descriptive categories for fact-backed evidence."""
+
+    NAMING = "naming"
+    DOCSTRING = "docstring"
+    SIGNATURE = "signature"
+    CALL_RELATIONSHIP = "call_relationship"
+    FILESYSTEM = "filesystem"
+    PROCESS = "process"
+    NETWORK = "network"
+    ENVIRONMENT = "environment"
+    LOGGING = "logging"
+    CONTROL_FLOW = "control_flow"
+    RETURNS = "returns"
+    EXCEPTIONS = "exceptions"
+    IMPORTS = "imports"
+    CLASS_STRUCTURE = "class_structure"
+    MODULE_STRUCTURE = "module_structure"
+
+
+class EvidenceStrength(StrEnum):
+    """Strength of the direct link between an Evidence and its source Fact."""
+
+    STRONG = "strong"
+    SUPPORTING = "supporting"
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,10 +179,13 @@ class ModuleFacts:
 
 @dataclass(frozen=True, slots=True)
 class InsightEvidence:
-    """One future human-readable claim linked to an objective static fact."""
+    """One short deterministic reformulation of an objective static fact."""
 
-    fact: str
-    detail: str
+    category: EvidenceCategory
+    code: str
+    description: str
+    strength: EvidenceStrength
+    reference: str | None = None
     source_line: int | None = None
 
 
