@@ -16,6 +16,17 @@ from pysynoptic.insights.evidence import (
     generate_module_evidence,
 )
 from pysynoptic.insights.facts import extract_module_facts, extract_project_facts
+from pysynoptic.insights.flow_explanation import (
+    FlowDecision,
+    FlowException,
+    FlowExplanation,
+    FlowExplanationReliability,
+    FlowLoop,
+    FlowOutcome,
+    FlowStep,
+    analyze_flow_explanation,
+    explain_callable_flow,
+)
 from pysynoptic.insights.models import (
     CallableFacts,
     CallableInsight,
@@ -46,6 +57,13 @@ __all__ = [
     "ClassInsight",
     "EvidenceCategory",
     "EvidenceStrength",
+    "FlowDecision",
+    "FlowException",
+    "FlowExplanation",
+    "FlowExplanationReliability",
+    "FlowLoop",
+    "FlowOutcome",
+    "FlowStep",
     "InsightConfidence",
     "InsightEvidence",
     "InsightInput",
@@ -60,6 +78,7 @@ __all__ = [
     "RoleSupport",
     "StaticOperation",
     "analyze_callable_insight",
+    "analyze_flow_explanation",
     "analyze_class_insight",
     "analyze_insights",
     "analyze_module_insight",
@@ -68,6 +87,7 @@ __all__ = [
     "classify_evidence",
     "extract_module_facts",
     "extract_project_facts",
+    "explain_callable_flow",
     "generate_callable_evidence",
     "generate_class_evidence",
     "generate_evidence",
