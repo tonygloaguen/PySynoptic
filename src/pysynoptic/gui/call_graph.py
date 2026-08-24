@@ -40,6 +40,7 @@ class ContextualCallGraphPanel(ttk.Frame):
         master: Any,
         *,
         on_open_flow: Callable[[str], None] | None = None,
+        on_callable_selected: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(master)
         self._analysis: ProjectAnalysis | None = None
@@ -48,6 +49,7 @@ class ContextualCallGraphPanel(ttk.Frame):
         self._selected_root: CallGraphRoot | None = None
         self.current_result: ContextualCallGraph | None = None
         self._on_open_flow = on_open_flow
+        self._on_callable_selected = on_callable_selected
         self._detail_links: dict[str, str] = {}
 
         controls = ttk.Frame(self)
@@ -184,7 +186,7 @@ class ContextualCallGraphPanel(ttk.Frame):
             if not candidates:
                 candidates = [root for root in self._roots if root.kind == "callable"]
             if candidates:
-                self.select_root(candidates[0].root_id)
+                self.select_root(candidates[0].root_id, notify=False)
 
     def search(self, query: str) -> tuple[CallGraphRoot, ...]:
         """Filter root choices and return the matching model objects."""
@@ -196,16 +198,22 @@ class ContextualCallGraphPanel(ttk.Frame):
         self.search_box.configure(values=self._option_labels(self._filtered_roots))
         return self._filtered_roots
 
-    def select_root(self, root_id: str) -> bool:
+    def select_root(self, root_id: str, *, notify: bool = True) -> bool:
         """Select a searchable root by stable node identifier and rebuild."""
         root = next((item for item in self._roots if item.root_id == root_id), None)
         if root is None:
             return False
+        if self._selected_root == root and self.current_result is not None:
+            if root.kind == "callable" and notify and self._on_callable_selected:
+                self._on_callable_selected(root.root_id)
+            return True
         self._selected_root = root
         self.direction_variable.set("Both")
         self.depth_variable.set("1")
         self.search_variable.set(root.label)
         self._rebuild()
+        if root.kind == "callable" and notify and self._on_callable_selected:
+            self._on_callable_selected(root.root_id)
         return True
 
     def set_direction(self, direction: CallGraphDirection) -> None:
@@ -361,4 +369,5 @@ class ContextualCallGraphPanel(ttk.Frame):
             self._on_open_flow(root.root_id)
 
     def _activate_node(self, node: GraphNode) -> None:
-        self.select_root(node.node_id)
+        if self.select_root(node.node_id):
+            self._open_selected_flow()

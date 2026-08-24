@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pysynoptic.graph import CallGraphDirection
+from pysynoptic.gui.project_tree import callable_short_label
 from pysynoptic.models import CallableIdentity, ProjectAnalysis
 
 DEFAULT_CALL_DIRECTION: CallGraphDirection = "both"
@@ -28,7 +29,9 @@ def search_flow_callables(
     analysis: ProjectAnalysis, query: str
 ) -> tuple[CallableIdentity, ...]:
     """Return deterministic callable selector matches without requiring Tk."""
-    normalized = query.strip().casefold()
+    normalized = query.strip().casefold().partition(" — ")[0]
+    if normalized.endswith("()"):
+        normalized = normalized[:-2]
     return tuple(
         item
         for item in sorted(
@@ -40,6 +43,7 @@ def search_flow_callables(
             ),
         )
         if normalized in item.qualified_name.casefold()
+        or normalized in callable_short_label(item).casefold()
     )
 
 
