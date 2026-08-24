@@ -83,7 +83,7 @@ def test_if_records_true_path(tmp_path: Path) -> None:
 
 
 def test_if_else_keeps_branches_distinct(tmp_path: Path) -> None:
-    _, explanation = explain_source(
+    flow, explanation = explain_source(
         tmp_path,
         (
             "def run(enabled):\n"
@@ -97,6 +97,25 @@ def test_if_else_keeps_branches_distinct(tmp_path: Path) -> None:
     assert [step.text for step in decision.true_path] == ["Call prepare()."]
     assert [step.text for step in decision.false_path] == ["Call skip()."]
     assert "Otherwise" in texts(explanation)[0]
+    node_ids = {node.label: node.node_id for node in flow.nodes}
+    assert explanation.callable_identity == flow.symbol_id
+    assert explanation.summary == (
+        "If enabled is true, call prepare(). Otherwise, call skip(). Return 0."
+    )
+    assert tuple(step.text for step in explanation.steps) == (
+        "If enabled is true, call prepare(). Otherwise, call skip().",
+        "Return 0.",
+    )
+    assert explanation.loops == ()
+    assert explanation.exceptions == ()
+    assert tuple(outcome.text for outcome in explanation.outcomes) == ("Return 0.",)
+    assert explanation.reliability is FlowExplanationReliability.HIGH
+    assert explanation.supporting_node_ids == (
+        node_ids["if enabled"],
+        node_ids["prepare()"],
+        node_ids["skip()"],
+        node_ids["return 0"],
+    )
 
 
 def test_if_elif_else_preserves_nested_false_decision(tmp_path: Path) -> None:
