@@ -2,12 +2,13 @@
 
 ## Supported versions
 
-The first supported public release line will be `v0.1.x`. Development
-milestones before `v0.1.0` do not receive security backports.
+The published `v0.1.x` line remains supported while `v0.2.0` is prepared.
+Development milestones before `v0.1.0` do not receive security backports.
 
 | Version | Supported |
 | --- | --- |
-| 0.1.x | Yes, once released |
+| 0.2.x | Yes, once released |
+| 0.1.x | Yes |
 | < 0.1.0 | No |
 
 Only the latest patch in a supported minor release is expected to receive
@@ -49,7 +50,8 @@ code must never be:
 
 The intended analysis inputs are filesystem metadata and Python source text.
 The implementation uses `ast.parse()` and static models to resolve structure
-and relationships.
+and relationships. Static Insights are derived locally from AST-based facts and
+the existing static models; analyzed source is not transmitted externally.
 
 A vulnerability that causes analyzed source to be imported or executed is
 security-significant. So is a path-handling defect that unexpectedly reads or

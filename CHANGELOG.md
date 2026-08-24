@@ -5,6 +5,32 @@ PySynoptic uses semantic versioning for public releases.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-24
+
+### Added
+
+- deterministic Static Insights for modules, classes, functions, and methods;
+- conservative role classification with qualitative High, Medium, or Unknown
+  confidence;
+- Purpose explanations with explicit docstring, inference, or structural
+  provenance;
+- structured responsibilities, inputs, outputs, side effects, callers, and
+  callees;
+- inspectable static Evidence supporting each Insight;
+- an Insights desktop view with synchronized Tree, Calls, Flow, and Insights
+  navigation.
+
+### Changed
+
+- callable selection now remains synchronized across all code-exploration
+  views.
+
+### Security
+
+- Static Insights preserve the static-only analysis boundary and are derived
+  locally from AST facts and existing static models;
+- analyzed source remains never imported, executed, or transmitted externally.
+
 ## [0.1.0] - 2026-08-24
 
 ### Added
