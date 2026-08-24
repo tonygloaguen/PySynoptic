@@ -53,6 +53,30 @@ class EvidenceStrength(StrEnum):
     SUPPORTING = "supporting"
 
 
+class InsightRole(StrEnum):
+    """Controlled initial vocabulary for conservative static roles."""
+
+    ORCHESTRATOR = "orchestrator"
+    ANALYZER = "analyzer"
+    PARSER = "parser"
+    RENDERER = "renderer"
+    EXPORTER = "exporter"
+    LOADER = "loader"
+    READER = "reader"
+    WRITER = "writer"
+    VALIDATOR = "validator"
+    TRANSFORMER = "transformer"
+    RESOLVER = "resolver"
+    SCANNER = "scanner"
+    GRAPH_BUILDER = "graph_builder"
+    CONTROLLER = "controller"
+    ADAPTER = "adapter"
+    MODEL = "model"
+    FACTORY = "factory"
+    UTILITY = "utility"
+    UNKNOWN = "unknown"
+
+
 @dataclass(frozen=True, slots=True)
 class ParameterFacts:
     """One syntactically declared callable parameter."""
@@ -187,6 +211,24 @@ class InsightEvidence:
     strength: EvidenceStrength
     reference: str | None = None
     source_line: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RoleSupport:
+    """Evidence retained to explain one accepted role."""
+
+    role: InsightRole
+    evidence: tuple[InsightEvidence, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RoleClassification:
+    """Conservative role selection without purpose or Insight confidence."""
+
+    primary_role: InsightRole
+    secondary_roles: tuple[InsightRole, ...] = ()
+    supporting_evidence: tuple[InsightEvidence, ...] = ()
+    secondary_support: tuple[RoleSupport, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
