@@ -9,6 +9,7 @@ from typing import TypeAlias
 
 import ttkbootstrap as ttk
 
+from pysynoptic.gui.ai_explanations import AIExplanationSession
 from pysynoptic.gui.flow_explanations import FlowExplanationCache
 from pysynoptic.gui.state import InsightSubjectKind
 from pysynoptic.insights import (
@@ -23,6 +24,11 @@ from pysynoptic.insights import (
     InsightInput,
     ModuleInsight,
     PurposeSource,
+)
+from pysynoptic.insights.ai_explanation import (
+    AIConfigurationError,
+    AIExplanationRequest,
+    AIExplanationResult,
 )
 
 InsightSubject: TypeAlias = ModuleInsight | ClassInsight | CallableInsight
@@ -289,6 +295,9 @@ class InsightsPanel(ttk.Frame):
         on_open_flow=None,
         on_open_flow_step: Callable[[str, tuple[str, ...]], None] | None = None,
         flow_explanations: FlowExplanationCache | None = None,
+        ai_explanations: AIExplanationSession | None = None,
+        on_configure_ai: Callable[[], None] | None = None,
+        on_confirm_ai_send: Callable[[], bool] | None = None,
     ) -> None:
         super().__init__(master, padding=10)
         self._catalog = InsightCatalog(None)
@@ -301,8 +310,16 @@ class InsightsPanel(ttk.Frame):
         self._on_open_flow = on_open_flow
         self._on_open_flow_step = on_open_flow_step
         self._flow_explanations = flow_explanations
+        self._ai_explanations = ai_explanations
+        self._on_configure_ai = on_configure_ai
+        self._on_confirm_ai_send = on_confirm_ai_send
         self._flow_step_links: dict[str, tuple[str, ...]] = {}
         self._selected_step_node_ids: tuple[str, ...] | None = None
+        self._ai_result: AIExplanationResult | None = None
+        self._show_ai_result = False
+        self._pending_ai_request_id: int | None = None
+        self._ai_busy = False
+        self._ai_message = ""
 
         actions = ttk.Frame(self)
         actions.pack(fill="x", pady=(0, 8))
@@ -322,6 +339,46 @@ class InsightsPanel(ttk.Frame):
             bootstyle="secondary-outline",
         )
         self.flow_button.pack(side="left")
+
+        self.ai_controls = ttk.Frame(self)
+        self.ai_controls.pack(fill="x", pady=(0, 8))
+        self.improve_ai_button = ttk.Button(
+            self.ai_controls,
+            text="Improve with AI",
+            command=self._improve_with_ai,
+            state="disabled",
+            bootstyle="info-outline",
+        )
+        self.improve_ai_button.pack(side="left", padx=(0, 6))
+        self.configure_ai_button = ttk.Button(
+            self.ai_controls,
+            text="AI Settings",
+            command=self._configure_ai,
+            bootstyle="secondary-outline",
+        )
+        self.configure_ai_button.pack(side="left", padx=(0, 6))
+        self.static_ai_button = ttk.Button(
+            self.ai_controls,
+            text="Static",
+            command=self._show_static_explanation,
+            state="disabled",
+            bootstyle="secondary-outline",
+        )
+        self.static_ai_button.pack(side="left", padx=(0, 4))
+        self.enhanced_ai_button = ttk.Button(
+            self.ai_controls,
+            text="AI enhanced",
+            command=self._show_ai_explanation,
+            state="disabled",
+            bootstyle="secondary-outline",
+        )
+        self.enhanced_ai_button.pack(side="left", padx=(0, 8))
+        self.ai_status_variable = ttk.StringVar(value="AI explanations: OFF")
+        ttk.Label(
+            self.ai_controls,
+            textvariable=self.ai_status_variable,
+            bootstyle="secondary",
+        ).pack(side="left")
 
         self.summary = ScrolledText(
             self,
@@ -371,6 +428,11 @@ class InsightsPanel(ttk.Frame):
         """Return the explanation currently presented for a callable."""
         return self._presentation.flow_explanation if self._presentation else None
 
+    @property
+    def ai_explanation_text(self) -> str | None:
+        """Return current optional prose without replacing static engine text."""
+        return self._ai_result.text if self._ai_result is not None else None
+
     def set_analysis(
         self,
         analysis: InsightAnalysis | None,
@@ -388,6 +450,11 @@ class InsightsPanel(ttk.Frame):
         self._evidence_expanded = False
         self._flow_step_links.clear()
         self._selected_step_node_ids = None
+        self._ai_result = None
+        self._show_ai_result = False
+        self._pending_ai_request_id = None
+        self._ai_busy = False
+        self._ai_message = ""
         self.evidence_text.pack_forget()
         self._render_empty()
 
@@ -408,8 +475,23 @@ class InsightsPanel(ttk.Frame):
                 flow_explanation = cached.explanation
         if previous_symbol_id != getattr(insight, "symbol_id", None):
             self._selected_step_node_ids = None
+            self._show_ai_result = False
+            self._ai_result = None
+            if not self._ai_busy:
+                self._ai_message = ""
         self._selection = selection
         self._presentation = present_insight(selection, insight, flow_explanation)
+        if (
+            isinstance(insight, CallableInsight)
+            and flow_explanation is not None
+            and self._ai_explanations is not None
+        ):
+            request = self._ai_explanations.build_request(
+                insight,
+                flow_explanation,
+                self._analysis,
+            )
+            self._ai_result = self._ai_explanations.peek(insight.symbol_id, request)
         self._render_presentation()
         return True
 
@@ -430,6 +512,7 @@ class InsightsPanel(ttk.Frame):
         self.evidence_button.configure(text="Evidence (0)", state="disabled")
         self.calls_button.configure(state="disabled")
         self.flow_button.configure(state="disabled")
+        self._render_ai_controls()
 
     def _render_presentation(self) -> None:
         presentation = self._presentation
@@ -453,9 +536,10 @@ class InsightsPanel(ttk.Frame):
         self._summary_field("Purpose", presentation.purpose)
         if presentation.callable_symbol_id is not None:
             explanation = presentation.flow_explanation
+            ai_text = self.ai_explanation_text if self._show_ai_result else None
             self._summary_field(
-                "How it works",
-                flow_summary_text(explanation),
+                "How it works — AI enhanced" if ai_text else "How it works — Static",
+                ai_text or flow_summary_text(explanation),
             )
             if explanation is not None:
                 self._summary_field(
@@ -483,7 +567,134 @@ class InsightsPanel(ttk.Frame):
         callable_state = "normal" if presentation.callable_symbol_id else "disabled"
         self.calls_button.configure(state=callable_state)
         self.flow_button.configure(state=callable_state)
+        self._render_ai_controls()
         self._render_evidence()
+
+    def refresh_ai_configuration(self) -> None:
+        """Refresh controls after the application changes session settings."""
+        self._ai_message = ""
+        self._ai_result = None
+        self._show_ai_result = False
+        self._pending_ai_request_id = None
+        self._ai_busy = False
+        self._render_ai_controls()
+
+    def _current_callable_insight(self) -> CallableInsight | None:
+        if self._selection is None:
+            return None
+        insight = self._catalog.find(self._selection)
+        return insight if isinstance(insight, CallableInsight) else None
+
+    def _current_ai_request(self) -> AIExplanationRequest | None:
+        insight = self._current_callable_insight()
+        explanation = self.flow_explanation
+        if insight is None or explanation is None or self._ai_explanations is None:
+            return None
+        return self._ai_explanations.build_request(
+            insight,
+            explanation,
+            self._analysis,
+        )
+
+    def _render_ai_controls(self) -> None:
+        session = self._ai_explanations
+        is_callable = self.selected_callable_symbol_id is not None
+        enabled = bool(session is not None and session.enabled)
+        if not enabled:
+            self.improve_ai_button.configure(
+                text="Improve with AI",
+                state="disabled",
+            )
+            status = self._ai_message or "AI explanations: OFF"
+        else:
+            self.improve_ai_button.configure(
+                text="Generating…" if self._ai_busy else "Improve with AI",
+                state="disabled" if self._ai_busy or not is_callable else "normal",
+            )
+            status = self._ai_message or (
+                f"{session.config.kind.value} · {session.config.model}"
+            )
+        result_state = (
+            "normal"
+            if self._ai_result is not None and not self._ai_busy
+            else "disabled"
+        )
+        self.static_ai_button.configure(state=result_state)
+        self.enhanced_ai_button.configure(state=result_state)
+        self.configure_ai_button.configure(
+            state="disabled" if self._ai_busy else "normal"
+        )
+        self.ai_status_variable.set(status)
+
+    def _configure_ai(self) -> None:
+        if self._on_configure_ai is not None:
+            self._on_configure_ai()
+
+    def _improve_with_ai(self) -> None:
+        session = self._ai_explanations
+        if session is None:
+            return
+        if self._ai_busy:
+            return
+        if not session.enabled:
+            self._configure_ai()
+            self._render_ai_controls()
+            return
+        insight = self._current_callable_insight()
+        request = self._current_ai_request()
+        if insight is None or request is None:
+            self._ai_message = "No static callable explanation is available."
+            self._render_ai_controls()
+            return
+        if session.needs_privacy_confirmation():
+            if self._on_confirm_ai_send is None or not self._on_confirm_ai_send():
+                return
+            session.confirm_current_endpoint()
+        try:
+            request_id = session.submit(insight.symbol_id, request)
+        except (AIConfigurationError, RuntimeError) as exc:
+            self._ai_message = str(exc)
+            self._render_ai_controls()
+            return
+        self._pending_ai_request_id = request_id
+        self._ai_busy = True
+        self._show_ai_result = False
+        self._ai_message = "Generating…"
+        self._render_ai_controls()
+        self.after(25, self._poll_ai_explanation)
+
+    def _poll_ai_explanation(self) -> None:
+        request_id = self._pending_ai_request_id
+        session = self._ai_explanations
+        if request_id is None or session is None or session.closed:
+            return
+        completion = session.poll(request_id)
+        if completion is None:
+            self.after(25, self._poll_ai_explanation)
+            return
+        self._pending_ai_request_id = None
+        self._ai_busy = False
+        is_current = completion.symbol_id == self.selected_callable_symbol_id
+        if completion.error_message is not None and is_current:
+            self._ai_message = f"AI explanation unavailable: {completion.error_message}"
+            self._show_ai_result = False
+        elif completion.result is not None and is_current:
+            self._ai_result = completion.result
+            self._show_ai_result = True
+            suffix = " (cached)" if completion.cache_hit else ""
+            self._ai_message = f"AI rewrite ready{suffix}."
+        elif not is_current:
+            self._ai_message = ""
+        self._render_presentation()
+
+    def _show_static_explanation(self) -> None:
+        self._show_ai_result = False
+        self._render_presentation()
+
+    def _show_ai_explanation(self) -> None:
+        if self._ai_result is not None:
+            self._show_ai_result = True
+            self._render_presentation()
 
     def _render_key_steps(self, steps: tuple[FlowStep, ...]) -> None:
         self.summary.insert("end", "Key steps\n", "heading")

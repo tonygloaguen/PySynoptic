@@ -11,6 +11,10 @@ from tkinter.scrolledtext import ScrolledText
 import ttkbootstrap as ttk
 
 from pysynoptic.graph import layout_dependency_graph
+from pysynoptic.gui.ai_explanations import (
+    AIExplanationSession,
+    prompt_ai_configuration,
+)
 from pysynoptic.gui.analysis_runner import AnalysisRunner
 from pysynoptic.gui.architecture import ArchitecturePanel
 from pysynoptic.gui.call_graph import ContextualCallGraphPanel
@@ -60,6 +64,7 @@ class PySynopticApp(ttk.Window):
         self._pending_tree_selection: str | None = None
         self._analysis_runner = AnalysisRunner(self.controller.analyze)
         self._flow_explanations = FlowExplanationCache()
+        self._ai_explanations = AIExplanationSession()
         self._analysis_poll_id: str | None = None
         self._active_mermaid_mode = "architecture"
 
@@ -205,6 +210,9 @@ class PySynopticApp(ttk.Window):
             on_open_flow=self._open_flow,
             on_open_flow_step=self._open_flow_step,
             flow_explanations=self._flow_explanations,
+            ai_explanations=self._ai_explanations,
+            on_configure_ai=self._configure_ai,
+            on_confirm_ai_send=self._confirm_ai_send,
         )
         self.notebook.add(self.insights_panel, text="Insights")
 
@@ -290,7 +298,36 @@ class PySynopticApp(ttk.Window):
             self.after_cancel(self._analysis_poll_id)
             self._analysis_poll_id = None
         self._analysis_runner.shutdown()
+        self._ai_explanations.shutdown()
         self.destroy()
+
+    def _configure_ai(self) -> None:
+        config = prompt_ai_configuration(self, self._ai_explanations.config)
+        if config is None:
+            return
+        self._ai_explanations.configure(config)
+        self.insights_panel.refresh_ai_configuration()
+
+    def _confirm_ai_send(self) -> bool:
+        config = self._ai_explanations.config
+        location = (
+            "This endpoint is a literal loopback address on this computer."
+            if self._ai_explanations.current_endpoint_is_local()
+            else "This endpoint may transmit the structured data over a network."
+        )
+        return bool(
+            messagebox.askokcancel(
+                "AI explanation privacy",
+                (
+                    "PySynoptic will send the structured static explanation for "
+                    "this callable. The Python source file itself will not be sent.\n\n"
+                    "Symbol, module, role, purpose, step, and callee names are sent "
+                    "and may themselves contain sensitive information.\n\n"
+                    f"Endpoint: {config.endpoint}\n{location}"
+                ),
+                parent=self,
+            )
+        )
 
     def export_mermaid(self, mode: str = "architecture") -> None:
         """Export one explicit current-view or whole-project Mermaid graph."""
@@ -357,6 +394,7 @@ class PySynopticApp(ttk.Window):
                 self.state.project_analysis,
                 self.state.insight_analysis,
             )
+            self._ai_explanations.set_generation(self._flow_explanations.generation)
         self.architecture_panel.set_analysis(self.state.project_analysis)
         self.call_graph_panel.set_analysis(self.state.project_analysis)
         self.flow_panel.set_analysis(self.state.project_analysis)
