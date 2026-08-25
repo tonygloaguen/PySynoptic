@@ -1,5 +1,13 @@
 """Deterministic static facts used by future code-understanding insights."""
 
+from pysynoptic.insights.ai_explanation import (
+    AIExplanationRequest,
+    AIExplanationResult,
+    AIExplanationService,
+    AIProviderConfig,
+    AIProviderKind,
+    build_ai_explanation_request,
+)
 from pysynoptic.insights.analyze import (
     analyze_callable_insight,
     analyze_class_insight,
@@ -51,6 +59,11 @@ from pysynoptic.insights.models import (
 from pysynoptic.insights.purpose import generate_purpose
 
 __all__ = [
+    "AIExplanationRequest",
+    "AIExplanationResult",
+    "AIExplanationService",
+    "AIProviderConfig",
+    "AIProviderKind",
     "CallableFacts",
     "CallableInsight",
     "ClassFacts",
@@ -83,6 +96,7 @@ __all__ = [
     "analyze_insights",
     "analyze_module_insight",
     "assess_confidence",
+    "build_ai_explanation_request",
     "build_insight_analysis",
     "classify_evidence",
     "extract_module_facts",
