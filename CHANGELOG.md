@@ -5,6 +5,30 @@ PySynoptic uses semantic versioning for public releases.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-25
+
+### Added
+
+- deterministic FlowExplanation summaries answering “How does it work?” for
+  functions and methods;
+- hierarchical Key Steps covering decisions, loops, exception paths, calls,
+  and outcomes;
+- Key Step navigation to the corresponding highlighted Flow node;
+- lazy caching of callable CFG and FlowExplanation results;
+- optional AI-enhanced explanation reformulation through OpenAI-compatible and
+  Ollama-compatible providers.
+
+### Security
+
+- AI explanations are disabled by default and require an explicit user action;
+- raw Python source and quoted literals are not sent to AI providers;
+- remote endpoints require confirmation, while keys remain session-only or
+  environment-provided and are never persisted;
+- AI requests and responses are bounded, network work stays outside the Tk
+  thread, and returned prose never becomes Evidence or a source of truth;
+- the existing non-execution and non-import boundary for analyzed code remains
+  unchanged.
+
 ## [0.2.0] - 2026-08-24
 
 ### Added

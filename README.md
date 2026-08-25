@@ -44,6 +44,10 @@ of the program that matters now.
 - per-callable Flow graphs for branches, loops, exceptions, calls, and exits;
 - deterministic Static Insights for code roles, purposes, inputs, outputs,
   side effects, and supporting evidence;
+- deterministic **How it works** explanations with hierarchical Key Steps and
+  direct navigation to highlighted Flow nodes;
+- optional AI-enhanced reformulation through OpenAI-compatible or
+  Ollama-compatible providers;
 - short graph labels backed by detailed source and relationship panels;
 - pan, zoom, fit, focus navigation, and contextual Mermaid export;
 - asynchronous analysis that keeps the desktop interface responsive;
@@ -140,8 +144,17 @@ analyzed project is never imported or executed.**
 
 ## Static Insights
 
-Static Insights answers “What is this code element for?” from locally derived
-AST facts and the existing static models. It reports:
+Static Insights answers two complementary questions from locally derived AST
+facts and the existing static models:
+
+- **What is it for?** — **Role** and **Purpose** describe the statically
+  observable intent of a module, class, function, or method.
+- **How does it work?** — **How it works** and hierarchical **Key Steps**
+  summarize a callable's decisions, loops, exception paths, calls, and
+  outcomes. Selecting a Key Step opens Flow and highlights the corresponding
+  node.
+
+The explanation also reports:
 
 - **Role** — a conservative category such as analyzer, parser, renderer, or
   orchestrator;
@@ -159,11 +172,29 @@ Confidence levels mean:
 - **UNKNOWN** — insufficient evidence for a reliable role.
 
 PySynoptic prefers **Unknown** over a convincing but unsupported explanation.
-Insights does not require AI or an external service, sends no analyzed source
-code elsewhere, and remains deterministic for the same source and version.
+Static Insights and FlowExplanation do not require AI or an external service
+and remain deterministic for the same source and version. Their CFG and
+explanation results are computed lazily and cached for responsive navigation.
 Docstrings are identified as author-declared information; inferred purposes
 are presented separately. Insights are conservative explanations, not a claim
 that every inferred role or purpose is always correct.
+
+## Optional AI explanations
+
+AI explanations are an optional reformulation layer for **How it works**. They
+are disabled by default and run only after an explicit user action. PySynoptic
+supports OpenAI-compatible and Ollama-compatible endpoints; it asks for
+confirmation before sending data to a remote endpoint.
+
+The raw Python source is never sent. The provider receives a bounded structured
+representation derived from the static analysis, with quoted literals
+redacted. Names, symbols, and inferred purposes remain present and may still be
+sensitive. Provider settings and API keys are session-only (or read from the
+environment), requests are limited to 12,000 characters, and returned prose is
+limited to 2,000 characters. Network work runs outside the Tk thread.
+
+AI text is a readability aid only. It never becomes Evidence and never replaces
+the deterministic static explanation as PySynoptic's source of truth.
 
 ## Static analysis philosophy
 
@@ -191,21 +222,23 @@ Analyzed code is **never**:
 - launched through a subprocess;
 - inspected through runtime module loading or introspection.
 
-Analysis, including Insights, uses filesystem metadata, source text, Python's
-AST, and static models locally. No analyzed source is transmitted externally.
-This is an architectural security boundary, not merely a usage convention. See
-[SECURITY.md](SECURITY.md) for vulnerability reporting and the supported-release
-policy.
+Analysis, including deterministic Insights and FlowExplanation, uses filesystem
+metadata, source text, Python's AST, and static models locally. Optional AI
+explanations never transmit raw Python source, but their structured request can
+contain names, symbols, and purposes; remote transmission requires explicit
+configuration, action, and confirmation. See [SECURITY.md](SECURITY.md) for the
+complete boundary, privacy details, vulnerability reporting, and the
+supported-release policy.
 
 ## Installation
 
 ### Standalone application
 
-The `v0.2.0` release provides native, self-contained assets built separately for
+The `v0.3.0` release provides native, self-contained assets built separately for
 each platform:
 
-- `PySynoptic-v0.2.0-Windows-x64.zip`
-- `PySynoptic-v0.2.0-Linux-x64.tar.gz`
+- `PySynoptic-v0.3.0-Windows-x64.zip`
+- `PySynoptic-v0.3.0-Linux-x64.tar.gz`
 
 Download an archive from [GitHub Releases](https://github.com/tonygloaguen/PySynoptic/releases).
 
@@ -334,6 +367,9 @@ mermaid = render_mermaid(project_analysis)
 - Static Insights can remain Unknown when the available source does not provide
   enough reliable evidence, and inferred purposes are not guaranteed to match
   every author's intent.
+- AI-enhanced explanations require a separately configured compatible service;
+  their prose may be incomplete or inaccurate and is never treated as static
+  Evidence.
 
 These are deliberate scope boundaries, not claims of complete Python runtime
 analysis or infallible code understanding.
